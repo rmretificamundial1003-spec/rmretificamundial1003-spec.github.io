@@ -3442,7 +3442,7 @@ function menuWhats(o, tipoIni){
       const c=$("#wa-lk",m); if (c) c.onchange=()=>{ comLink=c.checked; poe(); }; };
     const ta=$("#wa-m",m), go=$("#wa-go",m), fo=$("#wa-f",m);
     const link=()=>{ const n=foneWa(fo.value); go.href = n ? `https://wa.me/${n}?text=${encodeURIComponent(ta.value)}` : "#"; go.style.opacity = n?1:.5; };
-    const poe=()=>{ let t=msgWhats(o, tipo); if (comLink && ponteUrl() && cabeLink()) t=(aprovar?t.replace(/\n\n(Podemos seguir com o serviço\?|[^\n]*\?)$/, ""):t)+`\n\n✍️ ${aprovar?"Para aprovar":"Para autorizar o serviço"}, toque no link, confira e assine com o dedo:\n${ponteUrl()}?assinar=${tk}\n(o link vale 7 dias)`; ta.value=t; link(); asBox(); };
+    const poe=()=>{ let t=msgWhats(o, tipo); if (comLink && ponteUrl() && cabeLink()) t=msgComLinkAss(t, aprovar, tk); ta.value=t; link(); asBox(); };
     $("#wa-t",m).onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; tipo=b.dataset.k; $("#wa-t",m).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); poe(); };
     ta.oninput=link; fo.oninput=link; poe();
     go.onclick=e=>{ if (!foneWa(fo.value)){ e.preventDefault(); toast("Digite o telefone do cliente."); return; }
@@ -4466,6 +4466,8 @@ function estadoAss(o){
 }
 function seloAss(o, sempre){ const e=estadoAss(o); if (!e) return ""; if (!sempre && e.k==="assinou") return "";
   return e.cl ? ` <span class="pill ${e.cl}" title="${h(e.s)}">${h(e.t)}</span>` : ` <span class="muted" style="font-size:12px" title="${h(e.s)}">${h(e.t)}</span>`; }
+/* junta o link de assinatura à mensagem do WhatsApp */
+function msgComLinkAss(t, aprovar, tk){ return (aprovar?t.replace(/\n\n(Podemos seguir com o serviço\?|[^\n]*\?)$/, ""):t)+`\n\n👉 ${aprovar?"Para aprovar":"Para autorizar o serviço"}, toque no link, confira e assine com o dedo:\n${ponteUrl()}?assinar=${tk}\n(o link vale 7 dias)`; }
 const semAssinatura = o => !!(o.aprovacoes||[]).length && !assinaturaOS(o) && !["cancelada","orcamento"].includes(o.status);
 function formAssinarDepois(o){
   const v=valorAprovado(o)!=null?valorAprovado(o):totalOS(o), termo=termoAprovacao(o, v, o.previsao);
@@ -4866,11 +4868,14 @@ BIND.novaos = () => {
     abrirModal(`<h2>✅ O cliente aprovou ${money(nvTot())}?</h2><p class="muted" style="margin:0">${(()=>{ const c=caminhos().find(x=>x.id===n.caminhoId); return c&&!n.setor ? `A OS vai ser lançada e já vai para <b style="color:var(--ink)">${h(c.etapas[0].map(nomeEtapa).join(" + "))}</b>.` : n.setor ? `A OS vai ser lançada e já vai para <b style="color:var(--ink)">${h(n.setor)}</b>.` : "A OS vai ser lançada e o gerente manda para a oficina."; })()}</p><b>Como ele aprovou?</b>
       <div class="row" id="ca-c" style="gap:6px;flex-wrap:wrap">${COMO_APROV.map(x=>`<button type="button" class="chip ${n.como===x?"on":""}" data-c="${x}">${x}</button>`).join("")}</div>
       <label class="f" id="ca-ow">Observação (como aprovou)<input id="ca-o" value="${h(n.comoObs||"")}" placeholder="Ex.: áudio no WhatsApp às 10h"></label>
+      <div id="ca-zapw" hidden class="card" style="margin:8px 0 0;padding:12px;border:2px solid var(--ok)"><b>📲 O cliente não está aqui?</b> <span class="muted">Mande o orçamento pelo WhatsApp <b>com o link</b>: ele aprova e assina pelo celular. Quando ele assinar, aparece <b>"✅ Cliente aprovou"</b> na fila e você lança a OS.</span><button type="button" class="btn pri" id="ca-zap" style="width:100%;justify-content:center;margin-top:8px">📲 Mandar orçamento com link para assinar</button><div class="muted" style="font-size:12px;margin-top:6px">Ele já aprovou por áudio/mensagem e você quer lançar agora? Escreva na observação e toque em <b>Lançar OS</b> (a assinatura fica pendente).</div></div>
       ${htmlBlocoAssinatura()}
       <div class="acts"><button class="btn" id="ca-x">Voltar</button><button class="btn pri" id="ca-ok">Lançar OS</button></div>`, m=>{
       n.como=n.como||COMO_APROV[0]; m.querySelectorAll("[data-c]").forEach(x=>x.classList.toggle("on",x.dataset.c===n.como));
       const cl=nvCli(); const AS=ligarBlocoAssinatura(m, ()=>n.como, termoAprovacao({motor:nvMotorTxt(n), numMotor:n.numMotor}, nvTot(), n.previsao), cl?cl.nome:"");
-      $("#ca-c",m).onclick=e=>{ const b=e.target.closest("[data-c]"); if(!b) return; n.como=b.dataset.c; m.querySelectorAll("[data-c]").forEach(x=>x.classList.toggle("on",x===b)); AS.atual(); };
+      const zw=()=>{ $("#ca-zapw",m).hidden = !(n.como!=="Pessoalmente" && ponteUrl()); }; zw();
+      $("#ca-c",m).onclick=e=>{ const b=e.target.closest("[data-c]"); if(!b) return; n.como=b.dataset.c; m.querySelectorAll("[data-c]").forEach(x=>x.classList.toggle("on",x===b)); AS.atual(); zw(); };
+      $("#ca-zap",m).onclick=()=>{ const cl=nvCli(); if (!(cl && foneWa(cl.telefone)) && !foneWa(n.telefone||"")){ /* sem telefone: ainda salva, e a tela seguinte avisa */ } fecharModal(); n.aprovou=false; nvLancar(); };
       $("#ca-x",m).onclick=fecharModal; $("#ca-ok",m).onclick=()=>{ n.comoObs=$("#ca-o",m).value.trim();
         if (n.como!=="Pessoalmente" && !n.comoObs){ toast("Aprovação a distância: escreva como o cliente aprovou."); return; }
         const ra=AS.ler(); if (!ra.ok) return; n.assinatura=ra.ass; fecharModal(); n.aprovou=true; nvLancar(); }; }); };
@@ -4911,7 +4916,8 @@ async function nvLancar(){
     if (movidos.length || fotosEnv.length) toast("A OS não foi salva. O estoque foi devolvido. Tente de novo."); }
 }
 function nvSucesso(o, c){
-  const wa=foneWa(c.telefone);
+  const wa=foneWa(c.telefone), sxAprovar=o.status==="orcamento", sxTk=(wa && ponteUrl() && (sxAprovar || !assinaturaOS(o))) ? novoToken() : null;
+  const sxMsg = sxTk ? msgComLinkAss(msgWhats(o, sxAprovar?"orcamento":"os"), sxAprovar, sxTk) : msgWhats(o, sxAprovar?"orcamento":"os");
   abrirModal(`<h2 style="color:var(--ok)">${o.status==="orcamento"?`💾 Orçamento ${codOS(o)} salvo`:`✅ OS ${codOS(o)} lançada`}</h2>
     <div class="card" style="text-align:center;padding:12px;margin:0;border:2px dashed var(--accent)"><div class="muted" style="font-size:13px">${o.pecasMotor&&o.pecasMotor.length?"Número da OS (o mesmo em todas as peças)":`Escreva na ${o.pecaSolta?"peça":"peça / motor"}`}</div><div style="font-size:44px;font-weight:900;line-height:1.1">OS ${codOS(o)}</div><button class="btn sm" id="sx-etq" style="margin-top:6px">🏷️ Imprimir etiqueta</button>
       ${!o.pecasMotor&&!o.pecaSolta&&o.qtdPecas?`<div style="text-align:left;margin-top:8px;font-size:15px"><b>🔩 Peças deste motor:</b> ${h(txtPecasMotor(o))}<div class="muted" style="font-size:13px">Etiquetas: ${PECAS_MOTOR_ETQ.filter(pc=>qtdPeca(o,pc)>0).map(pc=>`<b class="mono">${h(letraPeca(pc))}-${h(String(o.numero))}</b>`).join(" · ")}</div><button class="btn sm" id="sx-etqp" style="margin-top:6px">🏷️ Imprimir etiquetas das peças</button></div>`:""}
@@ -4919,7 +4925,7 @@ function nvSucesso(o, c){
     <div style="font-size:16px">${h(c.nome)} · ${h(o.motor)} · <b>${money(totalOS(o))}</b></div>
     <div class="muted">${o.status==="orcamento"?"Ainda <b>não foi lançado</b> na oficina. Mande para o cliente. Quando ele aprovar, vá em <b>Minhas OS</b> e toque em <b>✅ Aprovou · Lançar</b>.":(o.setor?`Lançada e já está na tela do mecânico (${h(o.setor)}).`:"Lançada. Toque em <b>🔧 Mandar para a oficina</b> na OS, ou o gerente manda.")}</div>
     <div class="grid" style="gap:8px">
-      ${wa?`<a class="btn ${o.status==="orcamento"?"pri":""}" style="justify-content:center" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(msgWhats(o,o.status==="orcamento"?"orcamento":"os"))}">💬 ${o.status==="orcamento"?"Mandar orçamento":"Mandar a OS"} no WhatsApp</a>`:`<div class="banner warn" style="margin:0">Cliente sem telefone: não dá para mandar no WhatsApp.</div>`}
+      ${wa?`<a class="btn ${o.status==="orcamento"||sxTk?"pri":""}" id="sx-wa" style="justify-content:center;flex-direction:column;gap:2px" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(sxMsg)}">💬 ${o.status==="orcamento"?"Mandar orçamento":"Mandar a OS"} no WhatsApp${sxTk?`<span style="font-size:13px;font-weight:600">✍️ já vai com o link para o cliente ${sxAprovar?"aprovar e assinar":"assinar"}</span>`:""}</a>`:`<div class="banner warn" style="margin:0">Cliente sem telefone: não dá para mandar no WhatsApp.</div>`}
       ${o.entrada?`<button class="btn" id="sx-ent" style="justify-content:center">🖨 Imprimir ficha de entrada para o cliente assinar</button>`:""}
       <button class="btn" id="sx-ver" style="justify-content:center">Ver a OS</button></div>
     <div class="acts"><button class="btn pri" id="sx-ok">Fechar</button></div>`, m=>{
@@ -4927,6 +4933,7 @@ function nvSucesso(o, c){
     $("#sx-ok",m).onclick=()=>fim(false); $("#sx-ver",m).onclick=()=>fim(true);
     const e=$("#sx-ent",m); if (e) e.onclick=()=>folhaParaImprimir("Ficha de entrada · OS #"+o.numero, `ficha-entrada-os-${o.numero}.html`, htmlEntradaImp(o));
     $("#sx-etq",m).onclick=()=>imprimirEtiqueta(o);
+    { const sw=$("#sx-wa",m); if (sw && sxTk){ let feito=false; sw.addEventListener("click", ()=>{ if (feito) return; feito=true; criarPedidoAssinatura(o, sxTk, sxAprovar).catch(err=>{ feito=false; erro(err); }); }); } }
     { const ep=$("#sx-etqp",m); if (ep) ep.onclick=()=>imprimirEtiquetasPecas(o); }
   });
 }
