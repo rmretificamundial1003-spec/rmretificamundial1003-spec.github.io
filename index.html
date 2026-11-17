@@ -1251,7 +1251,7 @@ BIND.os = () => {
 const atrasoOS = o => { if (!["aberta","execucao","aguardando","pronta"].includes(o.status)) return 0; const d=diasParaPrazo(o); return d!==null && d<0 ? -d : 0; };
 function linhaOS(o){
   const at = atrasoOS(o);
-  return `<tr class="click ${at?"atrasada":""}" data-id="${o.id}"><td class="mono">${codOS(o)}</td><td>${at?`<span class="tag-atr">ATRASADA ${at} DIA${at>1?"S":""}</span><br>`:""}<span class="pill p-${o.status}">${STATUS[o.status]?.t||o.status}</span>${seloAss(o)}${o.prioridade==="urgente"?` <span class="chip-low">Urgente</span>`:""}${o.adiantadaEm?` <span class="pill p-execucao">⬆️ Adiantado</span>`:""}${esperaRemanejar(o)?` <span class="pill p-pronta">✅ Autorizar</span>`:""}${o.garantiaDe?` <span class="pill p-aguardando">🛡 Garantia</span>`:""}${estaDevendo(o)?` <span class="chip-low">💰 deve ${money(faltaPagar(o))}</span>`:""}${alertasAbertos(o).length?` <span class="chip-low">⚠️ ${alertasAbertos(o).length} pedido</span>`:""}${OFICINA&&naFila(o)?(foiImpressa(o)?` <span class="muted" style="font-size:12px" title="Impressa em ${h(dt(o.impressa.em))}">🖨 impressa</span>`:` <span style="font-size:12px;color:var(--accent)">🖨 falta imprimir</span>`):""}</td>
+  return `<tr class="click ${at?"atrasada":""}" data-id="${o.id}"><td class="mono">${codOS(o)}</td><td>${at?`<span class="tag-atr">ATRASADA ${at} DIA${at>1?"S":""}</span><br>`:""}<span class="pill p-${o.status}">${STATUS[o.status]?.t||o.status}</span>${o.correcao?` <span class="pill p-cancelada">↩️ Corrigir</span>`:""}${seloAss(o)}${o.prioridade==="urgente"?` <span class="chip-low">Urgente</span>`:""}${o.adiantadaEm?` <span class="pill p-execucao">⬆️ Adiantado</span>`:""}${esperaRemanejar(o)?` <span class="pill p-pronta">✅ Autorizar</span>`:""}${o.garantiaDe?` <span class="pill p-aguardando">🛡 Garantia</span>`:""}${estaDevendo(o)?` <span class="chip-low">💰 deve ${money(faltaPagar(o))}</span>`:""}${alertasAbertos(o).length?` <span class="chip-low">⚠️ ${alertasAbertos(o).length} pedido</span>`:""}${OFICINA&&naFila(o)?(foiImpressa(o)?` <span class="muted" style="font-size:12px" title="Impressa em ${h(dt(o.impressa.em))}">🖨 impressa</span>`:` <span style="font-size:12px;color:var(--accent)">🖨 falta imprimir</span>`):""}</td>
     <td>${h(o.cliente)}</td><td>${h(o.veiculo)}${o.motor?` <span class="muted">· ${h(o.motor)}</span>`:""}${o.numMotor?`<br><span class="muted mono" style="font-size:12px">Nº ${h(o.numMotor)}</span>`:""}</td><td>${h(nomeLinha(o.linha))}</td>${OFICINA?`<td>${h(fnome(o.responsavel))}</td>`:""}
     <td class="num">${dia(o.previsao)}${UI.osFiltro==="ativas"&&motivoFila(o).length?`<br><span style="font-size:12px;color:var(--accent)">${h(motivoFila(o).join(" · "))}</span>`:""}</td>${me.papel!=="funcionario"?`<td class="n">${money(totalOS(o))}</td>`:""}</tr>`;
 }
@@ -1381,10 +1381,12 @@ function shellOSDet(){
     <div id="d-gar"></div><div id="d-alertas" class="grid"></div>
     ${verPreco?`<div class="card"><h2>Serviços</h2><div id="d-serv" style="margin-top:6px"></div>
       <button type="button" class="btn pri" id="b-addserv" style="margin-top:10px;font-size:16px;padding:12px 18px">＋ Adicionar serviços</button>
+      ${!ehChefe()&&gerencia()?`<button type="button" class="btn sm" id="sv-ped" style="margin-top:8px">📨 Pedir ao chefe um serviço fora da tabela</button>`:""}
       ${ehChefe()?`<details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:13px">Serviço fora da tabela (só o chefe)</summary><form id="f-serv" class="row" style="margin-top:8px"><input id="s-desc" list="dl-serv" autocomplete="off" placeholder="Escolha da tabela ou escreva" style="flex:2;min-width:180px" required><datalist id="dl-serv"></datalist><input id="s-qtd" type="number" min="1" value="1" style="width:70px" aria-label="Quantidade" title="Quantas vezes"><input id="s-val" placeholder="Valor R$ (cada)" inputmode="decimal" style="width:140px" required><button class="btn" type="submit">Adicionar</button></form></details>`:""}</div>`:""}
     <div class="card"><h2>Peças</h2><div id="d-pecas" style="margin-top:6px"></div>
       <form id="f-peca" class="row" style="margin-top:10px"><input id="pc-sel" list="dl-pec" placeholder="Código ou nome da peça" style="flex:2;min-width:200px" required autocomplete="off">
-      <datalist id="dl-pec"></datalist><input id="pc-q" type="number" min="1" step="1" value="1" style="width:80px" aria-label="Quantidade"><button class="btn pri" type="submit">Lançar peça</button></form><div id="pc-msg" class="muted" style="font-size:13px;margin-top:4px"></div></div>
+      <datalist id="dl-pec"></datalist><input id="pc-q" type="number" min="1" step="1" value="1" style="width:80px" aria-label="Quantidade"><button class="btn pri" type="submit">Lançar peça</button></form><div id="pc-msg" class="muted" style="font-size:13px;margin-top:4px"></div>
+      <button type="button" class="btn sm" id="pc-fora" style="margin-top:8px">🛒 Peça que não tem no estoque (comprar fora)</button></div>
     <div id="d-ent"></div>
     ${col("c-ficha","📏 Medidas do motor",`<div class="row"><span class="spacer"></span><button type="button" class="btn sm" id="d-fic-ed"></button></div><div id="d-ficha" style="margin-top:8px"></div>`)}
     ${col("c-fotos","📷 Fotos",`<div class="fotos" id="d-fotos"></div><input type="file" id="f-foto" accept="image/*" multiple hidden>`,true)}
@@ -1392,7 +1394,7 @@ function shellOSDet(){
    <div class="grid">
     ${verPreco?`<div class="card"><h2>Resumo</h2><div id="d-tot" style="margin-top:8px"></div></div><div class="card" id="d-pag"></div>`:""}
     ${col("c-chk","✅ Checklist e medidas anotadas",`<div class="row"><span class="spacer"></span><button type="button" class="btn sm" id="d-laudo">📏 Laudo de medidas</button></div><div id="d-chk" style="margin-top:8px"></div>`,true)}
-    ${col("c-rastro","👷 Quem mexeu neste motor",`<div id="d-rastro" class="tbl-wrap"></div>`)}
+    ${OFICINA?col("c-rastro","👷 Quem mexeu neste motor",`<div id="d-rastro" class="tbl-wrap"></div>`):`<div id="d-rastro" hidden></div>`}
     ${col("c-hist","🕘 Histórico",`<div class="row"><span id="d-selo" style="font-size:13px"></span></div>
       <form id="f-nota" class="grid" style="margin:10px 0"><textarea id="n-txt" rows="2" placeholder="Anotar algo: medida, defeito encontrado, conversa com o cliente…" required></textarea><button class="btn" type="submit">Anotar no histórico</button></form>
       <ul class="timeline" id="d-hist"></ul>`,true)}
@@ -1400,12 +1402,14 @@ function shellOSDet(){
 }
 function bindOSDet(){
   $("#voltar").onclick = ()=>{ osAberta=null; montar(); };
+  { const sp=$("#sv-ped"); if (sp) sp.onclick=()=>{ const o=S.os.find(x=>x.id===osAberta); if (o) formPedirServico(o); }; }
   const fs = $("#f-serv"); if (fs) fs.onsubmit = async e => { e.preventDefault();
     const desc=$("#s-desc").value.trim(), val=num($("#s-val").value), qtd=Math.max(1, parseInt($("#s-qtd").value)||1);
     const tab=(S.precos||[]).find(x=>x.desc===desc && x.valor!=null), oo=S.os.find(x=>x.id===osAberta);
     if (precisaChefe() && tab && Math.abs(Number(tab.valor)-val)>0.005){ pedirMotivo("Valor diferente da tabela", `${h(desc)}: tabela ${money(tab.valor)}, você colocou ${money(val)}.<br>O serviço entra na OS depois que o chefe autorizar.`, async mot=>{ await pedirAutorizacao("servValor", `OS ${codOS(oo)}: ${desc} por ${money(val)} (tabela ${money(tab.valor)})`, {osId:osAberta, desc, valor:val, qtd, tabela:Number(tab.valor)}, mot); $("#s-desc").value=""; $("#s-val").value=""; $("#s-qtd").value=1; }); return; }
     try{ await patchOS(osAberta, d=>{ if(d.notaOk) throw {code:"travada"}; d.servicos=(d.servicos||[]).concat([{desc, valor:val, qtd}]); addHist(d, `Serviço adicionado: ${qtd>1?qtd+"× ":""}${desc} (${money(val)}${qtd>1?` cada = ${money(val*qtd)}`:""})`); }); $("#s-desc").value=""; $("#s-val").value=""; $("#s-qtd").value=1; }catch(err){ erro(err); }
   };
+  $("#pc-fora").onclick = ()=>{ const o=S.os.find(x=>x.id===osAberta); if (o) formPecaFora(o); };
   $("#f-peca").onsubmit = async e => { e.preventDefault();
     const txt = $("#pc-sel").value.trim().toLowerCase(), qtd = Math.max(1, parseInt($("#pc-q").value)||1);
     const p = S.pecas.find(p => (p.codigo && p.codigo.toLowerCase()===txt.split(" · ")[0]) || `${p.codigo||""} · ${p.nome}`.toLowerCase()===txt || p.nome.toLowerCase()===txt);
@@ -1546,9 +1550,52 @@ function formDesconto(o){
         fecharModal(); toast("✅ Desconto salvo com o motivo"); }catch(err){ erro(err); b.disabled=false; } };
   });
 }
+/* ===== DEVOLVER PARA CORREÇÃO =====
+   Quem devolve: gerente ou chefe (ao conferir uma OS com erro).  Quem corrige: o lojista que abriu (ou qualquer lojista/gerente/chefe).
+   Enquanto estiver devolvida, o lojista pode editar os dados da OS. Ao tocar "Já corrigi", quem devolveu é avisado no histórico e nas Tarefas. */
+const MOTIVOS_CORR = ["Cliente ou telefone errado","Serviço faltando ou a mais","Quantidade errada","Motor/veículo errado","Prazo errado","Falta assinatura/aprovação"];
+function formDevolverCorrecao(o){ if (!direcao()){ toast("Só o gerente ou o chefe devolve para correção."); return; }
+  abrirModal(`<h2>↩️ Devolver OS ${codOS(o)} para correção</h2><p class="muted" style="margin:0 0 8px">O lojista que abriu vê na hora, em vermelho, o que precisa corrigir.</p>
+    <div class="row" id="dc-m" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">${MOTIVOS_CORR.map(x=>`<button type="button" class="chip" data-m="${h(x)}">${h(x)}</button>`).join("")}</div>
+    <label class="f">O que está errado? *<textarea id="dc-t" rows="2" placeholder="Ex.: faltou a retífica do virabrequim"></textarea></label>
+    <div class="acts"><button class="btn" id="dc-x">Cancelar</button><button class="btn danger" id="dc-ok">↩️ Devolver</button></div>`, m=>{ const tx=$("#dc-t",m); $("#dc-x",m).onclick=fecharModal;
+    $("#dc-m",m).onclick=e=>{ const b=e.target.closest("[data-m]"); if(!b) return; tx.value = tx.value ? tx.value+" · "+b.dataset.m : b.dataset.m; tx.focus(); };
+    $("#dc-ok",m).onclick=async()=>{ const mot=tx.value.trim(); if (!mot){ toast("Escreva o que está errado."); tx.focus(); return; } const b=$("#dc-ok",m); b.disabled=true;
+      try{ await patchOS(o.id, d=>{ d.correcao={motivo:mot, em:Date.now(), por:me.id, porNome:me.nome, para:d.criadoPor||""}; addHist(d, `↩️ Devolvida para correção por ${me.nome}: ${mot}`); }); fecharModal(); toast("↩️ Devolvida. O lojista já está vendo."); }catch(err){ b.disabled=false; erro(err); } }; }); }
+async function marcarCorrigida(o){ if (!o.correcao) return; if (!(direcao()||ehLojista())){ toast("Só lojista, gerente ou chefe."); return; }
+  try{ await patchOS(o.id, d=>{ const c=d.correcao||{}; d.correcoes=(d.correcoes||[]).concat([Object.assign({}, c, {corrigidaEm:Date.now(), corrigidaPor:me.id, corrigidaPorNome:me.nome})]); d.correcao=null; d.corrigidaAviso={em:Date.now(), porNome:me.nome, motivo:c.motivo||"", para:c.por||""}; addHist(d, `✅ Corrigida por ${me.nome} (era: ${c.motivo||""})`); }); toast("✅ Marcada como corrigida. Quem devolveu foi avisado."); }catch(err){ erro(err); } }
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-corok]"); if (!b) return; const ox=S.os.find(x=>x.id===osAberta); if (ox) marcarCorrigida(ox); });
+/* Peça descoberta no meio do serviço que NÃO tem no estoque: entra na OS com o preço para o cliente e vai para a Lista de compras. */
+function formPecaFora(o){ if (!gerencia()){ toast("Só o gerente ou o chefe."); return; }
+  abrirModal(`<h2>🛒 Peça de fora · OS ${codOS(o)}</h2><p class="muted" style="margin:0 0 8px">Para peça que apareceu no meio do serviço e <b>não tem no estoque</b>. Ela entra na OS com o preço para o cliente e vai para a <b>Lista de compras</b>.</p>
+    <form id="fpf" class="form"><label class="f wide">Peça *<input id="pf-n" required placeholder="Ex.: Jogo de pistão 0,50 AP 1.6"></label>
+    <label class="f">Quantidade<input id="pf-q" type="number" min="1" step="1" value="1"></label>
+    <label class="f">Preço para o cliente R$ * <small class="muted">(cada)</small><input id="pf-v" inputmode="decimal" required placeholder="Ex.: 380,00"></label>
+    <label class="f wide row" style="gap:8px"><input type="checkbox" id="pf-c" checked style="width:22px;height:22px"> Pôr na Lista de compras (para pedir ao fornecedor)</label>
+    <div class="acts wide"><button type="button" class="btn" id="pf-x">Cancelar</button><button class="btn pri" type="submit">Pôr na OS</button></div></form>`, m=>{ $("#pf-x",m).onclick=fecharModal; $("#pf-n",m).focus();
+    $("#fpf",m).onsubmit=async e=>{ e.preventDefault(); const nome=$("#pf-n",m).value.trim(), qtd=Math.max(1,parseInt($("#pf-q",m).value)||1), v=num($("#pf-v",m).value);
+      if (!nome){ toast("Escreva qual é a peça."); return; } if (!(v>0)){ toast("Coloque o preço para o cliente."); return; }
+      const b=e.submitter; b.disabled=true;
+      try{ await patchOS(o.id, d=>{ if (d.notaOk) throw {code:"travada"}; d.pecas=(d.pecas||[]).concat([{pecaId:null, codigo:"", nome, qtd, preco:v, por:me.id, porNome:me.nome, em:Date.now(), semBaixa:true, encomendar:true}]); addHist(d, `🛒 Peça de fora no meio do serviço: ${qtd}× ${nome} · ${money(v*qtd)}`); });
+        if ($("#pf-c",m).checked) await db.collection("compras").add({nome, pecaId:null, qtd, motivo:`OS ${codOS(o)} · ${o.cliente||""}`, obs:"", osId:o.id, cliente:o.cliente||"", telefone:o.telefone||"", status:"pedir", origem:"os", em:Date.now(), por:me.id, porNome:me.nome});
+        fecharModal(); toast(o.status==="orcamento" ? "✅ Peça no orçamento" : "✅ Peça na OS. O valor mudou: avise o cliente (Serviço a mais) e confirme a aprovação."); }catch(err){ b.disabled=false; erro(err); } }; }); }
+/* Gerente pede ao chefe um serviço que não está na tabela. O chefe aprova com um toque em "Precisa de você" e o serviço entra na OS. */
+function formPedirServico(o){ if (!gerencia()){ toast("Só o gerente."); return; } if (o.notaOk){ toast("OS com nota: não muda mais."); return; }
+  abrirModal(`<h2>📨 Pedir serviço fora da tabela · OS ${codOS(o)}</h2><p class="muted" style="margin:0 0 8px">O pedido vai para o chefe. Quando ele aprovar, o serviço <b>entra sozinho na OS</b> e o sistema avisa que o cliente precisa aprovar o valor novo.</p>
+    <form id="fps" class="form"><label class="f wide">Serviço *<input id="ps-d" required placeholder="Ex.: Recuperar alojamento do rolamento"></label>
+    <label class="f">Quantidade<input id="ps-q" type="number" min="1" step="1" value="1"></label><label class="f">Valor sugerido R$ * <small class="muted">(cada)</small><input id="ps-v" inputmode="decimal" required></label>
+    <label class="f wide">Por que precisa? *<input id="ps-m" required placeholder="Ex.: a oficina achou trinca no alojamento"></label>
+    <label class="f wide row" style="gap:8px"><input type="checkbox" id="ps-t" style="width:22px;height:22px"> Sugerir ao chefe cadastrar na tabela também (para as próximas OS)</label>
+    <div class="acts wide"><button type="button" class="btn" id="ps-x">Cancelar</button><button class="btn pri" type="submit">📨 Mandar para o chefe</button></div></form>`, m=>{ $("#ps-x",m).onclick=fecharModal; $("#ps-d",m).focus();
+    $("#fps",m).onsubmit=async e=>{ e.preventDefault(); const desc=$("#ps-d",m).value.trim(), qtd=Math.max(1,parseInt($("#ps-q",m).value)||1), valor=num($("#ps-v",m).value), mot=$("#ps-m",m).value.trim(), tab=$("#ps-t",m).checked;
+      if (!desc || !(valor>0) || !mot){ toast("Preencha o serviço, o valor e o motivo."); return; } const b=e.submitter; b.disabled=true;
+      try{ await pedirAutorizacao("servValor", `Serviço fora da tabela na OS ${codOS(o)} (${o.cliente||""}): ${qtd>1?qtd+"× ":""}${desc} · ${money(valor)}${qtd>1?" cada":""}${tab?" · sugere cadastrar na tabela":""}`, {osId:o.id, desc, valor, qtd, addTabela:tab, linha:o.linha||"leve"}, mot);
+        await patchOS(o.id, d=>addHist(d, `📨 ${me.nome} pediu ao chefe o serviço fora da tabela: ${desc} (${money(valor)}) · ${mot}`)); fecharModal(); }catch(err){ b.disabled=false; erro(err); } }; }); }
 function maisAcoesOS(o){
   const trav=!!o.notaOk, ops=[];
-  if (gerencia()&&(!trav||ehChefe())) ops.push(["ed","✏️ Editar dados da OS"]);
+  if ((gerencia()||(ehLojista()&&o.correcao))&&(!trav||ehChefe())) ops.push(["ed","✏️ Editar dados da OS"]);
+  if (direcao() && !trav && !o.correcao && !["entregue","cancelada"].includes(o.status)) ops.push(["dev","↩️ Devolver para o lojista corrigir"]);
+  if (o.correcao && (direcao()||ehLojista())) ops.push(["corok","✅ Já corrigi esta OS"]);
   if (direcao()&&["aberta","execucao","aguardando"].includes(o.status)) ops.push(["adi","📢 Avisar a oficina / adiantar na fila"]);
   if (direcao()&&o.adiantadaEm) ops.push(["tira","⬇️ Tirar do topo da fila"]);
   ops.push(["ent", o.entrada?"🖨 Imprimir ficha de entrada":"📋 Preencher ficha de entrada"]);
@@ -1562,7 +1609,7 @@ function maisAcoesOS(o){
   abrirModal(`<h2>OS ${codOS(o)} · mais ações</h2><div class="grid" style="gap:8px">${ops.map(([k,t])=>`<button class="btn" style="justify-content:flex-start;text-align:left" data-k="${k}">${t}</button>`).join("")}</div><div class="acts"><button class="btn" id="ma-x">Fechar</button></div>`, m=>{
     $("#ma-x",m).onclick=fecharModal;
     m.onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; const k=b.dataset.k; fecharModal();
-      setTimeout(()=>{ if(k==="gar") abrirTermoGarantia(o); if(k==="ed") formOS(o); if(k==="adi") formAviso(o); if(k==="tira") tirarDoTopo(o.id); if(k==="res") imprimirOS(o); if(k==="canc") cancelarNota("OS", o.id); if(k==="laudo") verLaudo(o); if(k==="rel") abrirRelatorioCliente(o); if(k==="ass") formAssinarDepois(o); if(k==="asz") pedirAssinaturaZap(o); if(k==="etq") imprimirEtiqueta(o); if(k==="etqp") imprimirEtiquetasPecas(o);
+      setTimeout(()=>{ if(k==="dev") formDevolverCorrecao(o); if(k==="corok") marcarCorrigida(o); if(k==="gar") abrirTermoGarantia(o); if(k==="ed") formOS(o); if(k==="adi") formAviso(o); if(k==="tira") tirarDoTopo(o.id); if(k==="res") imprimirOS(o); if(k==="canc") cancelarNota("OS", o.id); if(k==="laudo") verLaudo(o); if(k==="rel") abrirRelatorioCliente(o); if(k==="ass") formAssinarDepois(o); if(k==="asz") pedirAssinaturaZap(o); if(k==="etq") imprimirEtiqueta(o); if(k==="etqp") imprimirEtiquetasPecas(o);
         if(k==="ent") o.entrada ? folhaParaImprimir("Ficha de entrada · OS #"+o.numero, `ficha-entrada-os-${o.numero}.html`, htmlEntradaImp(o)) : formEntrada(o); }, 150); };
   });
 }
@@ -1573,7 +1620,7 @@ function fillOSDet(){
   const verPreco = me.papel!=="funcionario";
   $("#d-tit").innerHTML = `OS <span class="mono" style="font-size:24px">${codOS(o)}</span> <span class="pill p-${o.status}" style="vertical-align:middle">${STATUS[o.status]?.t}</span>${seloAss(o, true)}`;
   const trav = !!o.notaOk;
-  const dc=$("#d-circ"); if (dc) dc.innerHTML = (OFICINA ? htmlCircuito(o) + htmlCaminho(o) + htmlBotoesPeca(o) : "") + (precisaReaprovar(o)?`<div class="banner bad" style="margin:8px 0 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">⚠️ Entrou coisa a mais depois da aprovação: o total passou de <b>${money(valorAprovado(o))}</b> para <b>${money(totalOS(o))}</b>. O cliente precisa aprovar de novo.</span>${foneWa(o.telefone)&&(direcao()||ehLojista())?`<button class="btn sm" id="d-wad">💬 Pedir aprovação</button>`:""}<button class="btn sm pri" id="d-reap">✅ Cliente aprovou</button></div>`:"");
+  const dc=$("#d-circ"); if (dc) dc.innerHTML = (o.correcao ? `<div class="banner" style="margin:0 0 8px;border-left:5px solid var(--bad);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">↩️ <b>Devolvida para correção</b> por ${h(o.correcao.porNome)} (${dt(o.correcao.em)}):<br><b style="color:var(--bad)">${h(o.correcao.motivo)}</b>${ehLojista()?`<br><span class="muted" style="font-size:13px">Corrija (⋯ Mais → ✏️ Editar dados, ou os serviços) e toque em <b>Já corrigi</b>.</span>`:""}</span>${direcao()||ehLojista()?`<button type="button" class="btn pri sm" data-corok="1">✅ Já corrigi</button>`:""}</div>` : "") + (OFICINA ? htmlCircuito(o) + htmlCaminho(o) + htmlBotoesPeca(o) : "") + (precisaReaprovar(o)?`<div class="banner bad" style="margin:8px 0 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">⚠️ Entrou coisa a mais depois da aprovação: o total passou de <b>${money(valorAprovado(o))}</b> para <b>${money(totalOS(o))}</b>. O cliente precisa aprovar de novo.</span>${foneWa(o.telefone)&&(direcao()||ehLojista())?`<button class="btn sm" id="d-wad">💬 Pedir aprovação</button>`:""}<button class="btn sm pri" id="d-reap">✅ Cliente aprovou</button></div>`:"");
   if (dc) dc.onclick=e=>{ const pg=e.target.closest("[data-pgp]"); if (pg){ paginaPeca(o.id, pg.dataset.pgp||null); return; } const r=e.target.closest("[data-cm-rec]"); if (r){ formRecusou(o); return; } const st=e.target.closest("[data-cm-set]"); if (st){ formMandarPeca(o, st.dataset.cmSet); return; } const sp=e.target.closest("[data-cm-sep]"); if (sp){ formSepararUnidade(o, sp.dataset.cmSep); } };
   const wad=$("#d-wad"); if (wad) wad.onclick=()=>menuWhats(o,"adicional"); const reap=$("#d-reap"); if (reap) reap.onclick=()=>formAprovacao(o);
   const prox = (TRANS[o.status]||[]).filter(podeStatus).filter(s=>!(trav && ["execucao","aguardando","cancelada"].includes(s)));
@@ -1591,7 +1638,7 @@ function fillOSDet(){
   if ($("#d-serv")) $("#d-serv").innerHTML = (o.servicos||[]).length ? `<table><tr><th>Serviço</th><th class="n">Vezes</th><th class="n">Valor cada</th><th class="n">Subtotal</th>${edS?"<th></th>":""}</tr>${o.servicos.map((s,i)=>`<tr><td>${h(s.desc)}</td><td class="n"><b>${sQtd(s)}</b></td><td class="n">${money(s.valor)}</td><td class="n"><b>${money(sTot(s))}</b></td>${edS?`<td class="n" style="white-space:nowrap"><button class="btn sm" data-es="${i}">Editar</button> <button class="btn sm danger" data-rs="${i}" aria-label="Remover serviço">✕</button></td>`:""}</tr>`).join("")}</table>` : `<div class="empty">Nenhum serviço lançado.</div>`;
   const pe = o.pecas||[];
   const pav=htmlPecasAval(o); $("#d-pecas").innerHTML = pav + (pe.length ? `<div class="tbl-wrap"><table><tr><th>Peça</th><th class="n">Qtd</th>${verPreco?`<th class="n">Unit.</th><th class="n">Subtotal</th>`:""}<th>Lançada por</th><th></th></tr>
-    ${pe.map((p,i)=>`<tr><td>${h(p.nome)} <span class="muted mono">${h(p.codigo)}</span>${p.semBaixa?`<br><span style="color:var(--warn);font-size:12px">ainda no estoque · sai quando o cliente aprovar</span>`:""}</td><td class="n">${p.qtd}</td>${verPreco?`<td class="n">${money(p.preco)}</td><td class="n">${money(p.qtd*p.preco)}</td>`:""}<td class="muted">${h(p.porNome)} · ${dt(p.em)}</td>
+    ${pe.map((p,i)=>`<tr><td>${h(p.nome)} <span class="muted mono">${h(p.codigo)}</span>${p.semBaixa&&!p.pecaId?`<br><span style="color:var(--info);font-size:12px">🛒 peça de fora (comprar)</span>`:p.semBaixa?`<br><span style="color:var(--warn);font-size:12px">ainda no estoque · sai quando o cliente aprovar</span>`:""}</td><td class="n">${p.qtd}</td>${verPreco?`<td class="n">${money(p.preco)}</td><td class="n">${money(p.qtd*p.preco)}</td>`:""}<td class="muted">${h(p.porNome)} · ${dt(p.em)}</td>
     <td class="n">${o.status!=="entregue"&&!trav&&(gerencia()||p.por===me.id)?`<button class="btn sm" data-rp="${i}">${p.semBaixa?"Tirar":"Devolver"}</button>`:""}</td></tr>`).join("")}</table></div>` : `<div class="empty">Nenhuma peça lançada ainda.</div>`);
   const dl = $("#dl-pec"), linha = o.linha;
   const ops = S.pecas.filter(p=>!p.linha||p.linha==="ambas"||p.linha===linha).map(p=>`<option value="${h((p.codigo?p.codigo+" · ":"")+p.nome)}">${h(p.aplicacao||"")} — ${p.qtd||0} em estoque</option>`).join("");
@@ -1601,6 +1648,7 @@ function fillOSDet(){
     const i=S.setores.indexOf(o.setor); ss.value = S.setores[i+1] || S.setores.find(x=>x!==o.setor) || ""; ss.dataset.k=sk; }
   $("#f-setor").style.display = !OFICINA || ["entregue","cancelada"].includes(o.status) || ehLojista() ? "none" : "";
   const fe = $("#f-peca"); fe.style.display = ["entregue","cancelada"].includes(o.status) || trav ? "none" : "";
+  { const pf=$("#pc-fora"); if (pf) pf.style.display = fe.style.display==="none" || !gerencia() ? "none" : ""; }
   const fsv = $("#f-serv"); if (fsv) fsv.style.display = trav ? "none" : "";
   let tb = $("#d-trava"); if (!tb){ tb=document.createElement("div"); tb.id="d-trava"; $("#d-grid").before(tb); }
   tb.innerHTML = trav && me.papel!=="funcionario" ? `<div class="banner warn">${o.semNota?"OS marcada sem nota pelo chefe.":"Nota registrada: "+h([o.nfServico&&"serviço nº "+o.nfServico, o.nfPecas&&"NF-e nº "+o.nfPecas].filter(Boolean).join(" · "))+" · "+money(o.nfValor)} Serviços, peças e desconto estão travados.</div>` : "";
@@ -2154,7 +2202,7 @@ function reciboBalcao(v){ const wa=foneWa(v.telefone);
       const nf=$("#rb-nf",m); if (nf) nf.onclick=()=>{ const vv=S.vendas.find(x=>x.id===v.id)||v; fecharModal(); formNotaVenda(vv); }; }); }
 
 /* ---------- CLIENTES ---------- */
-SHELL.clientes = () => `<div class="top"><h1>Clientes</h1><div class="row" style="gap:6px"><button class="btn" id="c-rep">👥 Repetidos${gruposRepetidos().length?` (${gruposRepetidos().length})`:""}</button><button class="btn pri" id="novo-c">Cadastrar cliente</button></div></div>
+SHELL.clientes = () => `<div class="top"><h1>Clientes</h1><div class="row" style="gap:6px"><button class="btn" id="c-rep" ${ehChefe()?"":"hidden"}>👥 Repetidos${gruposRepetidos().length?` (${gruposRepetidos().length})`:""}</button><button class="btn pri" id="novo-c">Cadastrar cliente</button></div></div>
   <div class="card"><input id="c-q" type="search" placeholder="Buscar nome, telefone, CPF/CNPJ" value="${h(UI.cliBusca)}" style="width:min(340px,100%);margin-bottom:10px"><div class="tbl-wrap" id="c-lista"></div></div>`;
 BIND.clientes = () => { $("#c-rep").onclick=formRepetidos;
   $("#novo-c").onclick = ()=>formCli();
@@ -2176,7 +2224,7 @@ function formCli(c){
     <label class="f">Tipo de cliente<select id="c-tp">${Object.entries(TIPOS_CLI).map(([k,t])=>`<option value="${k}" ${tipoCli(c)===k?"selected":""}>${t}</option>`).join("")}</select></label><label class="f">Prioridade<span style="display:flex;align-items:center;gap:8px;min-height:40px"><input type="checkbox" id="c-pri" style="width:22px;height:22px" ${c.prioritario?"checked":""} ${direcao()?"":"disabled"}> ⭐ Cliente prioritário</span>${direcao()?"":`<small class="muted">Só o gerente ou o chefe marca.</small>`}</label>${htmlDadosCli(c,"c")}
     ${!novo?`<div class="f wide"><b>🚗 Carros</b><div id="c-car" style="margin-top:4px">${(c.veiculos||[]).map((v,i)=>`<span class="chip" style="margin:0 6px 6px 0">${h(descCarro(v))} <button type="button" data-rmcar="${i}" title="Tirar" style="border:0;background:none;color:var(--bad);cursor:pointer">✕</button></span>`).join("")||`<span class="muted">Nenhum carro cadastrado.</span>`}</div><button type="button" class="btn sm" id="c-ncar" style="margin-top:4px">＋ Cadastrar carro</button></div>`:""}
     <label class="f wide">Observações<textarea id="c-o" rows="2">${h(c.obs)}</textarea></label>
-    <div class="acts wide">${!novo&&direcao()?`<button type="button" class="btn danger" id="c-lgpd">Apagar dados do cliente (LGPD)</button><span class="spacer"></span>`:""}<button type="button" class="btn" id="c-can">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{ maskFone($("#c-t",m));
+    <div class="acts wide">${!novo&&ehChefe()?`<button type="button" class="btn danger" id="c-lgpd">Apagar dados do cliente (LGPD)</button><span class="spacer"></span>`:""}<button type="button" class="btn" id="c-can">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{ maskFone($("#c-t",m));
     const lg=$("#c-lgpd",m); if (lg) lg.onclick=()=>confirmar(`Apagar os dados pessoais de ${c.nome}? O nome e o telefone somem do cadastro e das OS. As OS ficam só com o número e os valores (parte fiscal). Use só se o cliente pedir.`, async()=>{ try{ await anonimizarCliente(c); fecharModal(); }catch(err){ erro(err); } }); 
     $("#c-can",m).onclick=fecharModal;
     ligarDadosCli(m, "c");
@@ -2256,7 +2304,7 @@ function gruposRepetidos(){ const G=new Map(), uf={}; const pai=x=>uf[x]===x?x:(
     ks.forEach(k=>{ if (idx[k]) uf[pai(c.id)]=pai(idx[k]); else idx[k]=c.id; }); });
   S.clientes.forEach(c=>{ const r=pai(c.id); if(!G.has(r)) G.set(r,[]); G.get(r).push(c); }); return [...G.values()].filter(g=>g.length>1); }
 let autoJuntando=false, autoJuntouEm=0; const repDispensado=new Set();
-async function autoJuntarClientes(){ if (autoJuntando || !me || !(direcao()||ehLojista()) || !loaded.clientes || !loaded.os || $("#ov") || Date.now()-autoJuntouEm<60000) return; autoJuntouEm=Date.now();
+async function autoJuntarClientes(){ if (autoJuntando || !me || !ehChefe() || !loaded.clientes || !loaded.os || $("#ov") || Date.now()-autoJuntouEm<60000) return; autoJuntouEm=Date.now();
   const G=gruposRepetidos().filter(g=>{ const t=g.map(c=>digitos(c.telefone).slice(-8)); return t[0].length>=8 && t.every(x=>x===t[0]) && !g.some(c=>c.naoJuntar) && !repDispensado.has(g.map(c=>c.id).sort().join("|")); });
   if (!G.length) return; const g=G[0], pr=g.slice().sort((a,b)=>(a.criadoEm||0)-(b.criadoEm||0))[0], out=g.filter(c=>c.id!==pr.id), chave=g.map(c=>c.id).sort().join("|");
   const nOS=c=>S.os.filter(o=>o.clienteId===c.id).length;
@@ -2267,7 +2315,7 @@ async function autoJuntarClientes(){ if (autoJuntando || !me || !(direcao()||ehL
     $("#aj-n",m).onclick=async()=>{ fecharModal(); repDispensado.add(chave); try{ for (const c of g) await db.doc("clientes/"+c.id).update({naoJuntar:true}); auditar("Clientes", pr.nome, {repetido:"?"}, {repetido:"não juntar (outra pessoa) · decidido por "+me.nome}); }catch(err){ erro(err); } };
     $("#aj-s",m).onclick=async()=>{ if (autoJuntando) return; autoJuntando=true; fecharModal(); try{ await juntarClientes(pr, out, true); toast(`✅ ${out.map(x=>x.nome).join(", ")} juntado em ${pr.nome}`); }catch(err){ erro(err); } finally{ autoJuntando=false; } };
   }); }
-async function juntarClientes(principal, outros, auto){
+async function juntarClientes(principal, outros, auto){ if (!ehChefe()) throw new Error("Só o chefe junta (e apaga) clientes.");
   for (const o of outros){ const r=await db.collection("os").where("clienteId","==",o.id).limit(500).get();
     for (const d of r.docs) await db.doc("os/"+d.id).update({clienteId:principal.id, cliente:principal.nome, telefone:principal.telefone||""});
     for (const v of S.vendas.filter(v=>v.clienteId===o.id)) await db.doc("vendas/"+v.id).update({clienteId:principal.id});
@@ -2278,7 +2326,7 @@ async function juntarClientes(principal, outros, auto){
 const CAMPOS_CLI = {nome:"Nome", telefone:"WhatsApp", email:"E-mail", doc:"CPF/CNPJ", cidade:"Cidade", obs:"Observação", tipo:"Tipo", prioritario:"Prioritário"};
 function avisarChefeCliente(antes, depois){ if (ehChefe()) return; const mud=Object.keys(CAMPOS_CLI).filter(k=>k==="tipo" ? tipoCli(antes)!==tipoCli(depois) : k==="prioritario" ? !!antes.prioritario!==!!depois.prioritario : String(antes[k]??"")!==String(depois[k]??""));
   if (!mud.length) return; db.collection("avisosChefe").add({tipo:"cliente", clienteId:antes.id||"", cliente:depois.nome||antes.nome, txt:mud.map(k=>k==="prioritario"?`${CAMPOS_CLI[k]}: ${antes[k]?"sim":"não"} → ${depois[k]?"sim":"não"}`:`${CAMPOS_CLI[k]}: “${antes[k]||"—"}” → “${depois[k]||"—"}”`).join(" · "), em:Date.now(), por:me.id, porNome:me.nome, visto:false}).catch(e=>registrarFalha(e)); }
-function formRepetidos(){ if (!direcao()){ toast("Só o gerente (ou o chefe) junta clientes repetidos."); return; } const G=gruposRepetidos();
+function formRepetidos(){ if (!ehChefe()){ toast("Só o chefe junta (e apaga) clientes repetidos."); return; } const G=gruposRepetidos();
   abrirModal(`<h2>👥 Clientes repetidos</h2><p class="muted" style="margin:0 0 8px">Mesmo telefone ou mesmo nome. Escolha qual cadastro fica (o principal) e toque em Juntar. As OS dos outros passam para ele e os repetidos vão para a lixeira.</p>
     ${G.length?G.map((g,i)=>`<div class="card" style="margin:0 0 8px">${g.map((c,j)=>`<label class="row" style="gap:8px;padding:4px 0;cursor:pointer"><input type="radio" name="rp${i}" value="${h(c.id)}" ${j===0?"checked":""}><span style="flex:1"><b>${h(c.nome)}</b> · ${h(c.telefone||"sem telefone")} <span class="muted">· ${S.os.filter(o=>o.clienteId===c.id).length} OS</span></span></label>`).join("")}<button type="button" class="btn sm pri" data-junta="${i}" style="margin-top:6px">Juntar</button></div>`).join(""):`<div class="banner" style="margin:0">✅ Nenhum cliente repetido.</div>`}
     <div class="acts"><button class="btn" id="rp-x">Fechar</button></div>`, m=>{ $("#rp-x",m).onclick=fecharModal;
@@ -3562,7 +3610,7 @@ function formPreco(p){
     <label class="f wide">Serviço<input id="pr-d" required value="${h(p.desc)}" placeholder="Ex.: Retífica de cabeçote AP 1.6"></label>
     <label class="f">Linha<select id="pr-l">${[["ambas","Todas as linhas"],...LINHAS].map(([k,t])=>`<option value="${k}" ${p.linha===k?"selected":""}>${t}</option>`).join("")}</select></label>
     <label class="f">Valor R$<input id="pr-v" inputmode="decimal" required value="${p.valor!=null?String(p.valor).replace(".",","):""}" placeholder="Ex.: 450,00"></label>
-    <label class="f wide">Setor que faz este serviço<select id="pr-s"><option value="">— descobrir pelo nome (${h(setorDoServico(p.desc||"")||"nenhum")}) —</option>${(S.setores||[]).map(x=>`<option ${p.setor===x?"selected":""}>${h(x)}</option>`).join("")}</select></label>
+    <label class="f wide" ${OFICINA?"":"hidden"}>Setor que faz este serviço<select id="pr-s"><option value="">— descobrir pelo nome (${h(setorDoServico(p.desc||"")||"nenhum")}) —</option>${(S.setores||[]).map(x=>`<option ${p.setor===x?"selected":""}>${h(x)}</option>`).join("")}</select></label>
     <div class="acts wide">${novo?"":`<button type="button" class="btn danger" id="pr-del">Excluir</button><span class="spacer"></span>`}<button type="button" class="btn" id="pr-x">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{
     $("#pr-x",m).onclick=fecharModal;
     const del=$("#pr-del",m); if (del) del.onclick=()=>confirmar(`Tirar "${p.desc}" da tabela?`, async()=>{ try{ await apagarComLixeira("precos/"+p.id, p); auditar("Tabela de preços", p.desc, p, null); toast("Excluído"); }catch(err){ erro(err); } });
@@ -3743,6 +3791,8 @@ function pendenciasGerente0(){
     {k:"ljc", ic:"❌", t:"OS canceladas pelos lojistas", cor:"bad", l:S.os.filter(o=>o.status==="cancelada" && o.cancelamento && o.cancelamento.papel==="lojista" && !o.cancelamento.vistoEm).map(o=>({o, s:`${h(o.cancelamento.porNome)} · ${h(o.cancelamento.motivo)} · ${h(o.cancelamento.texto)}`}))},
     {k:"avis", ic:"📣", t:"Prontos e o cliente ainda não foi avisado", cor:"warn", l:S.os.filter(o=>o.status==="pronta" && !o.clienteAvisadoEm).map(o=>({o, s:`pronto desde ${dt(o.prontaEm)}${o.criadoPorPapel==="lojista"?` · lojista ${h(fnome(o.criadoPor))}`:""}`}))},
     {k:"aprzap", ic:"✅", t:"Cliente aprovou pelo WhatsApp: lançar a OS", cor:"ok", l:S.os.filter(o=>o.status==="orcamento" && o.aprovacaoRemota && !o.aprovacaoRemota.lancada).map(o=>({o, s:`${h(o.aprovacaoRemota.nome)} assinou ${dt(o.aprovacaoRemota.em)} · ${money(o.aprovacaoRemota.valor)}`}))},
+    {k:"corr", ic:"↩️", t:"OS devolvidas para correção (esperando o lojista)", cor:"warn", l:S.os.filter(o=>o.correcao && !["entregue","cancelada"].includes(o.status)).map(o=>({o, s:h(o.correcao.motivo)+" · devolvida por "+h(o.correcao.porNome)+" "+dt(o.correcao.em)}))},
+    {k:"corok", ic:"✅", t:"OS corrigidas pelo lojista (confira)", cor:"ok", l:S.os.filter(o=>o.corrigidaAviso && !o.corrigidaAviso.visto && Date.now()-o.corrigidaAviso.em<3*864e5 && (!o.corrigidaAviso.para || o.corrigidaAviso.para===me.id || ehChefe())).map(o=>({o, s:"corrigida por "+h(o.corrigidaAviso.porNome)+" · era: "+h(o.corrigidaAviso.motivo)}))},
     {k:"espass", ic:"⏳", t:"Orçamentos esperando o cliente assinar (mais de 2 dias ou link vencido)", cor:"warn", l:S.os.filter(o=>o.status==="orcamento" && (e=>e && (e.k==="vencido" || e.atraso))(estadoAss(o))).map(o=>({o, s:h(estadoAss(o).t)+" · "+h(estadoAss(o).s)}))},
     {k:"semass", ic:"✍️", t:"OS sem assinatura do cliente", cor:"warn", l:S.os.filter(semAssinatura).map(o=>({o, s:`aprovou ${h(((o.aprovacoes||[]).slice(-1)[0]||{}).como||"")}`}))},
     {k:"reap", ic:"⚠️", t:"Valor mudou · cliente precisa aprovar de novo", cor:"bad", l:S.os.filter(precisaReaprovar).map(o=>({o, s:`aprovado ${money(valorAprovado(o))} → agora ${money(totalOS(o))}`}))},
@@ -4083,7 +4133,7 @@ FILL.chefe = () => {
   $("#pc-din").innerHTML = tile("ok", money(rHoje), "Recebido hoje") + tile("ok", money(rMes), "Recebido no mês") + tile(res>=0?"ok":"bad", money(res), "Resultado do mês") + tile(venc.length?"bad":"ok", money(vVal), "Vencido", `${venc.length} OS`);
   $("#pc-mes").innerHTML = tile("info", money(recLoja(h0)), "Vendas da loja hoje") + tile("accent", nEnt, "Motores entregues hoje") + tile("warn", money(desp+comp), "Despesas + compras", `despesas ${money(desp)} · peças ${money(comp)}`) + tile("info", money(aRec), "A receber", `${dev.length} OS`);
   // alertas
-  const PRIO=["chefe","libpix","semnf","contas","cliAlt","maq","falhas","banco","extrato","aprzap","espass","seg","prob","atr","venc","semmec","reap","semass","cx","senha","ljc","hoje","aut","loj","avis","nota","orc","parada","carga","dados","pecas","comp","falta","defeito","errada","medida","outro","cont","imp","bkp","bkteste"];
+  const PRIO=["chefe","libpix","semnf","contas","cliAlt","maq","falhas","banco","extrato","aprzap","corok","corr","espass","seg","prob","atr","venc","semmec","reap","semass","cx","senha","ljc","hoje","aut","loj","avis","nota","orc","parada","carga","dados","pecas","comp","falta","defeito","errada","medida","outro","cont","imp","bkp","bkteste"];
   const P0 = pendenciasGerente().filter(p=>p.l.length||p.txt||p.n||p.html).sort((a,b)=>(PRIO.indexOf(a.k)<0?99:PRIO.indexOf(a.k))-(PRIO.indexOf(b.k)<0?99:PRIO.indexOf(b.k)));
   const P = UI.pcTodos ? P0 : P0.slice(0,5);
   $("#pc-al").innerHTML = (P.length ? P.map(p=>`<button type="button" class="row" data-pcgo="${h(p.go||"agora")}" data-pck="${h(p.k)}" style="width:100%;text-align:left;gap:10px;padding:10px 6px;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;cursor:pointer;border-left:4px solid var(--${p.cor||"line"})"><span style="font-size:20px">${p.ic}</span><span style="flex:1;font-weight:600">${h(p.t)}</span><b style="font-size:18px">${p.l.length||p.n||"!"}</b><span class="muted">›</span></button>`).join("") : `<div class="banner" style="margin:0">✅ Nada esperando por você agora.</div>`) + (P0.length>5 ? `<button type="button" class="btn sm" id="pc-mais" style="margin-top:8px">${UI.pcTodos?"Mostrar só os 5 mais importantes":`Ver todos (${P0.length})`}</button>` : "");
@@ -4257,6 +4307,7 @@ async function aplicarAutorizacao(a){
     addHist(d, P.valor>0 ? `Desconto ${ant?`mudado de ${money(ant)} para`:"dado:"} ${money(P.valor)} · Motivo: ${a.motivo} · ${quem}` : `Desconto de ${money(ant)} retirado · Motivo: ${a.motivo} · ${quem}`); });
   if (a.tipo==="preco"){ const d={desc:P.desc, linha:P.linha, valor:P.valor, atualizadoEm:Date.now(), porNome:a.porNome, autorizadoPor:me.nome}; const ant=P.id&&(S.precos||[]).find(x=>x.id===P.id); if (P.id) await db.doc("precos/"+P.id).update(d); else { d.criadoEm=Date.now(); await db.collection("precos").add(d); } auditar("Tabela de preços", P.desc, ant?{valor:ant.valor}:null, {valor:P.valor}); }
   if (a.tipo==="pecaPreco"){ const pc=peca(P.pecaId); await comTrava("pecas/"+P.pecaId, ref=>ref.update({preco:P.preco, custo:P.custo, atualizadoEm:Date.now()})); auditar("Estoque · peças", (pc||{}).nome, {preco:(pc||{}).preco, custo:(pc||{}).custo}, {preco:P.preco, custo:P.custo}); }
+  if (a.tipo==="servValor" && P.addTabela && !(S.precos||[]).some(x=>norm(x.desc)===norm(P.desc))) await db.collection("precos").add({desc:P.desc, linha:P.linha||"ambas", valor:P.valor, criadoEm:Date.now(), atualizadoEm:Date.now(), porNome:a.porNome, autorizadoPor:me.nome});
   if (a.tipo==="servValor") await patchOS(P.osId, d=>{ if(d.notaOk) throw {code:"travada"}; d.servicos=(d.servicos||[]).concat([{desc:P.desc, valor:P.valor, qtd:P.qtd||1}]); addHist(d, `Serviço adicionado: ${(P.qtd||1)>1?P.qtd+"× ":""}${P.desc} (${money(P.valor)}, tabela ${money(P.tabela)}) · Motivo: ${a.motivo} · ${quem}`); });
   if (a.tipo==="servEditar") await patchOS(P.osId, d=>{ if(d.notaOk) throw {code:"travada"}; const x=(d.servicos||[]).find(y=>y.desc===P.desc && Number(y.valor)===Number(P.valorAntes)); if (!x) throw {code:"invalid_argument"}; x.valor=P.valor; addHist(d, `Preço do serviço ${P.desc}: ${money(P.valorAntes)} → ${money(P.valor)} cada · Motivo: ${a.motivo} · ${quem}`); });
   if (a.tipo==="servRemover") await patchOS(P.osId, d=>{ if(d.notaOk) throw {code:"travada"}; const k=(d.servicos||[]).findIndex(x=>x.desc===P.desc && Number(x.valor)===Number(P.valor)); if (k<0) throw {code:"invalid_argument"}; d.servicos.splice(k,1); addHist(d, `Serviço removido: ${P.desc} (${money(P.valor)}) · Motivo: ${a.motivo} · ${quem}`); });
@@ -4606,7 +4657,7 @@ function formAprovacao(o, depois){
     $("#ap-x",m).onclick=fecharModal;
     $("#ap-ok",m).onclick=async()=>{ const quem=$("#ap-q",m).value.trim(); if(!quem){ toast("Escreva quem aprovou."); return; }
       if (como!=="Pessoalmente" && !$("#ap-o",m).value.trim()){ toast("Aprovação a distância: escreva na observação como o cliente aprovou."); return; }
-      const ra=AS.ler(); if (!ra.ok) return; if (AR && como!=="Pessoalmente"){ ra.ass=Object.assign({}, AR); delete ra.ass.lancada; } const b=$("#ap-ok",m); b.disabled=true;
+      const ra=AS.ler(); if (!ra.ok) return; if (AR && como!=="Pessoalmente"){ ra.ass=Object.assign({}, AR); delete ra.ass.lancada; if (!ra.ass.doc){ const cl=cliDaOS(o)||{}; if (cl.doc){ ra.ass.doc=cl.doc; ra.ass.docDoCadastro=true; } } } const b=$("#ap-ok",m); b.disabled=true;
       try{ await patchOS(o.id, d=>{ const v=totalOS(d); if (AR && d.aprovacaoRemota) d.aprovacaoRemota.lancada=Date.now(); d.aprovacoes=(d.aprovacoes||[]).concat([{valor:v, servicos:(d.servicos||[]).map(x=>({desc:x.desc, valor:x.valor, qtd:sQtd(x)})), pecas:(d.pecas||[]).map(x=>({nome:x.nome, qtd:x.qtd, preco:x.preco})), desconto:Number(d.desconto)||0, como, quem, obs:$("#ap-o",m).value.trim(), em:Date.now(), por:me.id, porNome:me.nome, ...(ra.ass?{assinatura:ra.ass}:{})}]);
           addHist(d, `Cliente aprovou ${money(v)} · ${como} · ${quem}${$("#ap-o",m).value.trim()?` · ${$("#ap-o",m).value.trim()}`:""}${ra.ass?" · ✍️ assinou na tela":" · sem assinatura (a distância)"}`);
           if (depois==="aberta" && d.status==="orcamento"){ d.status="aberta"; d.lancadaEm=Date.now(); d.lancadaPorNome=me.nome; addHist(d, `OS lançada (cliente aprovou) por ${me.nome} · Situação: Orçamento → Aprovada`); if (d.caminho && d.etapa==null && !d.setor) iniciarCaminho(d); else if (d.aguardaAprov && d.etapa!=null){ d.aguardaAprov=false; irParaEtapa(d, d.etapa+1, [{oque:oqueOS(d), de:d.setor||"Avaliação"}]); } } });
@@ -4727,7 +4778,7 @@ BIND.lojas = () => {
   $("#lj-pend").onclick=e=>{ const g=k=>{ const b=e.target.closest(`[data-${k}]`); return b && S.os.find(o=>o.id===b.getAttribute("data-"+k)); };
     let o; if ((o=g("ljman"))){ if (etapasDe(o).length) patchOS(o.id, d=>{ if (!liberada(d)) iniciarCaminho(d); }).then(()=>toast("✅ Mandada pelo caminho.")).catch(erro); else formLiberar(o); } else if ((o=g("ljav"))) menuWhats(o,"pronto"); else if ((o=g("ljok"))) marcarClienteAvisado(o.id, "outro jeito"); else if ((o=g("ljad"))) menuWhats(o,"adicional"); else if ((o=g("ljor"))) menuWhats(o,"orcamento"); else if ((o=g("ljap"))) formAprovacao(o, o.status==="orcamento"?"aberta":undefined);
     else if ((o=g("ljlem"))) menuWhats(o,"lembrete"); else if ((o=g("ljcan"))) formCancelar(o); else if ((o=g("ljcob"))) menuWhats(o,"cobranca"); else if ((o=g("ljrec"))) formPagamento(o);
-    else if ((o=g("ljreg"))) formNota(o); else if ((o=g("ljnf"))) mandarNota(o);
+    else if ((o=g("ljreg"))) formNota(o); else if ((o=g("ljnf"))) mandarNota(o); else if ((o=g("ljcor"))) abrirOS(o.id);
     else if ((o=g("ljent"))){ if (!o.notaOk){ toast("Antes de entregar, registre a nota fiscal desta OS."); formNota(o); return; } formPagamento(o, true); } };
   $("#lj-l").onclick=e=>{ const w=e.target.closest("[data-ljwa]"); if (w){ menuWhats(S.os.find(o=>o.id===w.dataset.ljwa)); return; } if (e.target.closest("a")) return; const tr=e.target.closest("tr[data-id],.lj-card[data-id]"); if(tr) abrirOS(tr.dataset.id); };
 };
@@ -4735,6 +4786,7 @@ FILL.lojas = () => { if ($("#lj-av")) $("#lj-av").innerHTML = htmlAvisosCli();
   if (!$("#lj-pend")) return;
   const P=pendLojista(), lin=(o,btn)=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line);gap:10px;align-items:center"><b class="mono">${codOS(o)}</b><span style="flex:1">${h(o.cliente)} · ${h(o.motor||"")} · ${money(totalOS(o))}</span>${btn}</div>`;
   $("#lj-pend").innerHTML = [
+    (P.corrigir||[]).length?`<div class="card" style="border-left:5px solid var(--bad);margin-bottom:10px"><h2>↩️ Devolvidas para você corrigir (${P.corrigir.length})</h2>${P.corrigir.map(o=>lin(o,`<span style="color:var(--bad);font-size:13px">${h(o.correcao.motivo)}</span> <button class="btn sm pri" data-ljcor="${o.id}">Abrir e corrigir</button>`)).join("")}</div>`:"",
     P.pronto.length?`<div class="card" style="border-left:5px solid var(--ok);margin-bottom:10px"><h2>🟢 Motor pronto · avise o cliente (${P.pronto.length})</h2>${P.pronto.map(o=>lin(o,`<button class="btn pri sm" data-ljav="${o.id}">💬 Avisar o cliente</button> <button class="btn sm" data-ljok="${o.id}">Já avisei</button>`)).join("")}</div>`:"",
     P.reaprovar.length?`<div class="card" style="border-left:5px solid var(--bad);margin-bottom:10px"><h2>⚠️ Valor mudou · cliente precisa aprovar de novo (${P.reaprovar.length})</h2>${P.reaprovar.map(o=>lin(o,`<span class="muted" style="font-size:13px">era ${money(valorAprovado(o))}</span> <button class="btn sm" data-ljad="${o.id}">💬 Pedir aprovação</button> <button class="btn sm pri" data-ljap="${o.id}">✅ Aprovou</button>`)).join("")}</div>`:"",
     P.parados.length?`<div class="card" style="border-left:5px solid var(--bad);margin-bottom:10px"><h2>⏰ Orçamento parado · cliente não respondeu (${P.parados.length})</h2><div class="muted" style="font-size:13px;margin-bottom:6px">Faz ${ORC_PARADO_DIAS} dias ou mais sem resposta. Mande um lembrete ou cancele se ele desistiu.</div>${P.parados.map(o=>lin(o,`<span class="tag-atr">${diasDesde(o.orcContatoEm||o.criadoEm)} dias</span> <button class="btn sm pri" data-ljlem="${o.id}">💬 Lembrar o cliente</button> <button class="btn sm" data-ljap="${o.id}">✅ Aprovou · Lançar</button> <button class="btn sm danger" data-ljcan="${o.id}">Não quis</button>`)).join("")}</div>`:"",
@@ -4751,7 +4803,7 @@ FILL.lojas = () => { if ($("#lj-av")) $("#lj-av").innerHTML = htmlAvisosCli();
       <div class="row" style="gap:8px;align-items:center"><b class="mono">${codOS(o)}</b><span class="pill p-${o.status}">${STATUS[o.status]?.t}</span>${seloAss(o)}<span class="spacer"></span><b>${money(totalOS(o))}</b></div>
       <div style="margin-top:4px"><b>${h(o.cliente)}</b> · ${h(o.veiculo||"")} ${h(o.motor||"")}</div>
       <div class="muted" style="font-size:13px;margin-top:2px">${h(etapaAtual(o))}${ondeEsta(o)?`<br><b style="color:var(--ink)">📍 ${h(ondeEsta(o))}</b>`:""}${o.previsao?` · entrega ${dia(o.previsao)}`:""}${at?` · <span style="color:var(--bad);font-weight:600">${at} dia(s) atrasada</span>`:""}</div></button>`; }).join(""); return; }
-  $("#lj-l").innerHTML = (l.length ? `<table><tr><th>Nº</th><th>Situação</th><th>Cliente</th><th>Veículo / motor</th><th>Etapa</th><th>Previsão</th><th class="n">Total</th><th></th></tr>${l.map(o=>{ const at=atrasoOS(o); return `<tr class="click ${at?"atrasada":""}" data-id="${o.id}"><td class="mono">${codOS(o)}</td><td><span class="pill p-${o.status}">${STATUS[o.status]?.t}</span>${seloAss(o)}${o.recebidaEm||o.status==="orcamento"||loja||liberada(o)?"":` <span class="muted" style="font-size:12px">· esperando ir para a oficina</span>`}</td><td>${h(o.cliente)}<br><span style="font-size:13px">${o.telefone?`<a href="tel:${h(String(o.telefone).replace(/\D/g,""))}" style="color:var(--info)">📞 ${h(o.telefone)}</a>`:`<span class="muted">sem telefone</span>`}</span></td><td>${h(o.veiculo||"")} <span class="muted">${h(o.motor||"")}</span></td><td style="font-size:13px">${h(etapaAtual(o))}${ondeEsta(o)?`<br><b>📍 ${h(ondeEsta(o))}</b>`:""}${loja?`<br><span class="muted" style="font-size:12px">aberta por ${h(fnome(o.criadoPor))}</span>`:""}</td><td>${dia(o.previsao)}${at?`<br><span class="tag-atr">ATRASADA ${at}d</span>`:""}</td><td class="n">${money(totalOS(o))}</td><td class="n">${foneWa(o.telefone)?`<button class="btn sm" data-ljwa="${o.id}">💬 WhatsApp</button>`:""}</td></tr>`; }).join("")}</table>`
+  $("#lj-l").innerHTML = (l.length ? `<table><tr><th>Nº</th><th>Situação</th><th>Cliente</th><th>Veículo / motor</th><th>Etapa</th><th>Previsão</th><th class="n">Total</th><th></th></tr>${l.map(o=>{ const at=atrasoOS(o); return `<tr class="click ${at?"atrasada":""}" data-id="${o.id}"><td class="mono">${codOS(o)}</td><td><span class="pill p-${o.status}">${STATUS[o.status]?.t}</span>${o.correcao?` <span class="pill p-cancelada">↩️ Corrigir</span>`:""}${seloAss(o)}${o.recebidaEm||o.status==="orcamento"||loja||liberada(o)?"":` <span class="muted" style="font-size:12px">· esperando ir para a oficina</span>`}</td><td>${h(o.cliente)}<br><span style="font-size:13px">${o.telefone?`<a href="tel:${h(String(o.telefone).replace(/\D/g,""))}" style="color:var(--info)">📞 ${h(o.telefone)}</a>`:`<span class="muted">sem telefone</span>`}</span></td><td>${h(o.veiculo||"")} <span class="muted">${h(o.motor||"")}</span></td><td style="font-size:13px">${h(etapaAtual(o))}${ondeEsta(o)?`<br><b>📍 ${h(ondeEsta(o))}</b>`:""}${loja?`<br><span class="muted" style="font-size:12px">aberta por ${h(fnome(o.criadoPor))}</span>`:""}</td><td>${dia(o.previsao)}${at?`<br><span class="tag-atr">ATRASADA ${at}d</span>`:""}</td><td class="n">${money(totalOS(o))}</td><td class="n">${foneWa(o.telefone)?`<button class="btn sm" data-ljwa="${o.id}">💬 WhatsApp</button>`:""}</td></tr>`; }).join("")}</table>`
     : `<div class="empty">${loja?"Nenhuma OS encontrada na loja.":osDoLojista().length?"Nenhuma OS com esse filtro.":"Você ainda não abriu nenhuma OS. Aperte + Nova OS."}</div>`)
     + (loja&&!q?`<div class="muted" style="font-size:13px;margin-top:8px">Mostrando as 30 mais recentes. Digite no campo de busca para achar qualquer OS ou cliente.</div>`:"");
 };
@@ -5172,7 +5224,7 @@ function pendLojista(){ const l=osDoLojista();
   const orc=l.filter(o=>o.status==="orcamento");
   return { pronto:l.filter(o=>o.status==="pronta" && !o.clienteAvisadoEm), buscar:l.filter(o=>o.status==="pronta" && o.clienteAvisadoEm),
     parados:orc.filter(parado), aprovar:orc.filter(o=>!parado(o)), reaprovar:l.filter(precisaReaprovar),
-    receber:l.filter(o=>o.status==="entregue" && faltaPagar(o)>0.009), mandar:l.filter(o=>o.status==="aberta" && !liberada(o)) }; }
+    receber:l.filter(o=>o.status==="entregue" && faltaPagar(o)>0.009), mandar:OFICINA?l.filter(o=>o.status==="aberta" && !liberada(o)):[], corrigir:l.filter(o=>o.correcao && !["entregue","cancelada"].includes(o.status)) }; }
 const ORC_PARADO_DIAS = 2;
 const diasDesde = t => Math.floor((Date.now()-(t||0))/864e5);
 
@@ -6158,17 +6210,17 @@ function formZerar(){ if (!ehDono()){ toast("Só o dono."); return; }
       }catch(err){ erro(err); b.disabled=false; $("#zr-x",m).disabled=false; } };
   });
 }
-SHELL.equipe = () => `<div class="top"><h1>Equipe</h1><div class="row" style="gap:6px">${ehChefe() && !idDono() && (!window.__FB || window.__FB.dono) ? `<button class="btn" id="eq-dono">👑 Eu sou o dono</button>` : ehDono() ? `<span class="pill" style="align-self:center">👑 Você é o dono · invisível</span>` : ""}${ehDono()?`<button class="btn danger" id="eq-zerar">🧹 Começar de verdade</button>`:""}<button class="btn pri" id="novo-f">Cadastrar pessoa</button></div></div>
+SHELL.equipe = () => `<div class="top"><h1>Equipe</h1><div class="row" style="gap:6px">${ehChefe() && !idDono() && (!window.__FB || window.__FB.dono) ? `<button class="btn" id="eq-dono">👑 Eu sou o dono</button>` : ehDono() ? `<span class="pill" style="align-self:center">👑 Você é o dono · invisível</span>` : ""}${ehDono()?`<button class="btn" id="eq-senhas">🔑 Senhas da equipe</button><button class="btn danger" id="eq-zerar">🧹 Começar de verdade</button>`:""}<button class="btn pri" id="novo-f">Cadastrar pessoa</button></div></div>
   <div class="card" id="eq-pedsen" hidden></div>
   <div class="card" style="margin-bottom:14px"><h2>📱 Quem está conectado</h2><p class="muted" style="margin:4px 0 8px">Sessões abertas nas últimas 12 horas. Tocar em <b>Encerrar</b> tira a pessoa do sistema na hora, naquele aparelho.</p><div id="eq-ses"></div></div>
-  <div class="card"><p class="muted" style="margin:0 0 10px">Mecânicos entram tocando no nome e digitando a senha. Gerente e chefe não aparecem na tela de entrada: entram por "🔒 Acesso restrito", só com a senha (que precisa ser diferente para cada um). <b>Chefe</b> vê tudo, inclusive faturamento, custos e equipe. <b>Gerente</b> cuida da operação (painel, OS, estoque, loja, clientes e registro das notas fiscais) e vê os valores de cada item, mas não os totais do dia e do mês. <b>Mecânico</b> pertence a um setor e já abre vendo as OS do setor dele. Ele lança peças usadas, fotos e anotações, e muda a situação do serviço.</p><div class="tbl-wrap" id="f-lista"></div></div>
-  <div class="card" style="margin-top:14px"><h2>Setores da oficina</h2><p class="muted" style="margin:4px 0 10px">A ordem aqui é o caminho normal do motor na oficina. Cada mecânico pertence a um setor e vê as OS que estão nele.</p>
+  <div class="card"><p class="muted" style="margin:0 0 10px">${OFICINA?"":"<b>Fase 1:</b> só chefes, gerente e lojistas. Lojista entra tocando no nome e digitando a senha. "}${OFICINA?"Mecânicos entram tocando no nome e digitando a senha.":""} Gerente e chefe não aparecem na tela de entrada: entram por "🔒 Acesso restrito", só com a senha (que precisa ser diferente para cada um). <b>Chefe</b> vê tudo, inclusive faturamento, custos e equipe. <b>Gerente</b> cuida da operação (painel, OS, estoque, loja, clientes e registro das notas fiscais) e vê os valores de cada item, mas não os totais do dia e do mês. <b>Mecânico</b> pertence a um setor e já abre vendo as OS do setor dele. Ele lança peças usadas, fotos e anotações, e muda a situação do serviço.</p><div class="tbl-wrap" id="f-lista"></div></div>
+  <div class="card" style="margin-top:14px;${OFICINA?"":"display:none"}"><h2>Setores da oficina</h2><p class="muted" style="margin:4px 0 10px">A ordem aqui é o caminho normal do motor na oficina. Cada mecânico pertence a um setor e vê as OS que estão nele.</p>
   <ol id="st-lista" style="margin:0 0 12px;padding-left:22px;display:grid;gap:6px"></ol>
   <form id="f-st" class="row"><input id="st-n" placeholder="Nome do novo setor" required maxlength="30" style="flex:1;min-width:180px"><button class="btn" type="submit">Adicionar setor</button></form></div>
-  <div class="card" style="margin-top:14px"><div class="row"><h2 style="margin-right:auto">🧭 Caminhos das peças</h2><button class="btn sm" id="cm-novo">+ Novo caminho</button></div>
+  <div class="card" style="margin-top:14px;${OFICINA?"":"display:none"}"><div class="row"><h2 style="margin-right:auto">🧭 Caminhos das peças</h2><button class="btn sm" id="cm-novo">+ Novo caminho</button></div>
     <p class="muted" style="margin:4px 0 10px">O trajeto que cada tipo de serviço faz na oficina. O mecânico só toca TERMINEI e o sistema manda para a próxima etapa. Pode repetir setor (ex.: lavar de novo) e ter peças em setores <b>ao mesmo tempo</b>.</p>
     <div id="cm-lista"></div></div>
-  <div class="card" style="margin-top:14px"><div class="row"><h2 style="margin-right:auto">⚙️ Máquinas</h2><button class="btn sm" id="mq-novo">+ Nova máquina</button></div><p class="muted" style="margin:4px 0 10px">Quando uma máquina para (o mecânico avisa pelo celular), as peças que dependem dela ficam marcadas e o gerente recebe o aviso.</p><div id="mq-lista"></div></div>
+  <div class="card" style="margin-top:14px;${OFICINA?"":"display:none"}"><div class="row"><h2 style="margin-right:auto">⚙️ Máquinas</h2><button class="btn sm" id="mq-novo">+ Nova máquina</button></div><p class="muted" style="margin:4px 0 10px">Quando uma máquina para (o mecânico avisa pelo celular), as peças que dependem dela ficam marcadas e o gerente recebe o aviso.</p><div id="mq-lista"></div></div>
   <div class="card" style="margin-top:14px"><h2>Regras da fila</h2><ol style="margin:6px 0 0;padding-left:20px;line-height:1.8">
     <li><b>Adiantado pelo gerente</b>: sempre no topo.</li><li><b>Atrasados</b>: o mais atrasado primeiro.</li><li><b>Entrega hoje</b>.</li>
     <li><b>Os demais pelo prazo</b>: ⭐ cliente prioritário ganha 3 dias de vantagem, contrato 2 e urgente mais 2. Dentro do mesmo grupo, ⭐ prioritário vem primeiro.</li>
@@ -6224,7 +6276,7 @@ async function apagarTeste(){
   if (assets) for (const id of ids){ await assets.delete(id).catch(()=>{}); }
   msg.textContent = `Pronto: ${n} registros e ${ids.size} arquivos apagados.`;
 }
-BIND.equipe = () => { $("#novo-f").onclick=()=>formFunc(); { const bz=$("#eq-zerar"); if (bz) bz.onclick=formZerar; }
+BIND.equipe = () => { $("#novo-f").onclick=()=>formFunc(); { const bs=$("#eq-senhas"); if (bs) bs.onclick=verSenhasEquipe; } { const bz=$("#eq-zerar"); if (bz) bz.onclick=formZerar; }
   $("#f-lista").addEventListener("click", e=>{ const b=e.target.closest("[data-comoid]"); if(!b) return; const f=S.funcionarios.find(x=>x.id===b.dataset.comoid); if(!f) return; entrarComoDono(f); });
   if ($("#eq-dono")) $("#eq-dono").onclick=()=>confirmar(`Marcar ${me.nome} como o DONO? Você vai ver tudo (inclusive os outros chefes) e ficar invisível para todos. Só pode existir um dono, e ninguém mais consegue ativar isso.`, async()=>{ try{ await db.doc("funcionarios/"+me.id).update({dono:true}); me.dono=true; toast("👑 Pronto: você é o dono."); }catch(err){ erro(err); } });
   $("#eq-ses").onclick=e=>{ const b=e.target.closest("[data-encses]"); if(!b) return; const x=(S.sessoes||[]).find(y=>y.id===b.dataset.encses); if(!x) return;
@@ -6260,6 +6312,15 @@ FILL.equipe = () => {
   $("#f-lista").innerHTML = `<table><tr><th>Nome</th><th>Função</th><th>Setor</th><th>Situação</th><th class="n">OS em andamento</th><th></th></tr>${l.map(f=>`<tr><td><b>${h(f.nome)}</b>${f.email?`<br><span class="muted" style="font-size:12px">${h(f.email)}</span>`:(window.__FB&&f.ativo!==false?`<br><span style="font-size:12px;color:var(--warn,#b26a00)">sem Gmail</span>`:"")}</td><td>${h(cargo(f))}</td><td>${f.papel==="funcionario"?h(setoresDe(f).join(", ")||"—"):`<span class="muted">—</span>`}</td><td>${f.ativo===false?`<span class="muted">Inativo</span>`:"Ativo"}</td>
     <td class="n">${S.os.filter(o=>o.responsavel===f.id&&["aberta","execucao","aguardando"].includes(o.status)).length}</td><td class="n" style="white-space:nowrap">${ehChefe()&&f.id!==me.id&&f.ativo!==false&&!f.dono?`<button class="btn sm" data-comoid="${f.id}">👁 Entrar como</button> `:""}${f.papel==="chefe"&&!ehChefe()?"":`<button class="btn sm" data-ed="${f.id}">Editar</button>`}${podeExcluirFunc(f)?` <button class="btn sm danger" data-exf="${f.id}">Excluir</button>`:""}</td></tr>`).join("")}</table>`;
 };
+/* Só o dono (invisível): vê a senha de todos, inclusive dos chefes. É a segurança caso alguém esqueça. */
+async function verSenhasEquipe(){ if (!ehDono()){ toast("Só o dono."); return; }
+  const L=S.funcionarios.filter(f=>f.ativo!==false && !f.dono && (OFICINA || f.papel!=="funcionario")).sort((a,b)=>(NIVEL[b.papel]||0)-(NIVEL[a.papel]||0) || String(a.nome).localeCompare(b.nome));
+  const pins={}; await Promise.all(L.map(f=>db.doc("senhas/"+f.id).get().then(s=>{ pins[f.id]=s.exists?String(s.data().pin||""):(f.pin!=null?String(f.pin):""); }).catch(()=>{ pins[f.id]=f.pin!=null?String(f.pin):null; })));
+  abrirModal(`<h2>🔑 Senhas da equipe</h2><p class="muted" style="margin:0 0 8px">Só você (dono) vê esta tela. Toque em 👁 para mostrar. Passe a senha <b>pessoalmente</b>. Para trocar, use <b>Editar</b> na lista da Equipe.</p>
+    <div class="tbl-wrap"><table><tr><th>Nome</th><th>Função</th><th>Senha</th></tr>${L.map(f=>`<tr><td><b>${h(f.nome)}</b></td><td>${h(PAPEL[f.papel]||f.papel)}</td><td><span class="mono" data-pin="${h(pins[f.id]||"")}">${pins[f.id]===null?"<span class='muted'>não deu para ler</span>":pins[f.id]?"••••••••":"<span class='muted'>sem senha</span>"}</span>${pins[f.id]?` <button type="button" class="btn sm" data-ver="1">👁</button>`:""}</td></tr>`).join("")}</table></div>
+    <div class="acts"><button class="btn pri" id="vs-x">Fechar</button></div>`, m=>{ $("#vs-x",m).onclick=fecharModal;
+    m.addEventListener("click", e=>{ const b=e.target.closest("[data-ver]"); if(!b) return; const sp=b.previousElementSibling; const on=sp.textContent.startsWith("•"); sp.textContent = on ? sp.dataset.pin : "••••••••"; b.textContent = on ? "🙈" : "👁"; }); });
+  auditar("Equipe", "senhas", null, {viu:"lista de senhas"}); }
 function formFunc(f){
   const novo=!f; f=f||{papel:OFICINA?"funcionario":"lojista", ativo:true};
   abrirModal(`<h2>${novo?"Cadastrar pessoa":"Editar "+h(f.nome)}</h2><form id="ff" class="form">
@@ -6274,12 +6335,15 @@ function formFunc(f){
     $("#f-can",m).onclick=fecharModal;
     let pinAtual = "";
     const vis=()=>{ $("#f-setwrap",m).style.display = $("#f-p",m).value==="funcionario" ? "" : "none"; $("#f-pinreg",m).textContent = senhaAdm($("#f-p",m).value) ? "(4 letras e 4 números)" : "(4 números)"; }; $("#f-p",m).onchange=vis; vis();
-    if (!novo) db.doc("senhas/"+f.id).get().then(s=>{ const i=$("#f-pin",m); if(!i) return; pinAtual = s.exists ? String(s.data().pin||"") : (f.pin!=null?String(f.pin):""); i.value=pinAtual; i.placeholder = pinAtual?"":"sem senha salva · digite uma"; }).catch(()=>{ const i=$("#f-pin",m); if(i) i.placeholder="digite para trocar"; });
+    const ocultaPin = !novo && f.papel==="chefe" && f.id!==me.id && !ehDono();
+    if (ocultaPin){ const i=$("#f-pin",m); i.value=""; i.disabled=true; i.placeholder="🔒 só o dono vê e troca a senha de chefe"; }
+    if (!novo && !ocultaPin) db.doc("senhas/"+f.id).get().then(s=>{ const i=$("#f-pin",m); if(!i) return; pinAtual = s.exists ? String(s.data().pin||"") : (f.pin!=null?String(f.pin):""); i.value=pinAtual; i.placeholder = pinAtual?"":"sem senha salva · digite uma"; }).catch(()=>{ const i=$("#f-pin",m); if(i) i.placeholder="digite para trocar"; });
     $("#ff",m).onsubmit=async e=>{ e.preventDefault();
       const d={nome:$("#f-n",m).value.trim(), papel:$("#f-p",m).value, ativo:$("#f-a",m).value==="1"}; const pinNovo=$("#f-pin",m).value.trim();
       const trocaPin = !!pinNovo && pinNovo!==pinAtual; if (novo && !pinNovo){ toast("Digite a senha da pessoa."); return; }
       if (trocaPin || (pinNovo && d.papel!==f.papel)){ const er=regraSenha(d.papel, pinNovo); if (er){ toast(er); return; } }
       if (f.papel==="chefe" && !ehChefe()){ toast("Só o chefe mexe no cadastro de outro chefe."); return; }
+      if (!novo && f.papel==="chefe" && f.id!==me.id && !ehDono() && pinNovo){ toast("Só o dono troca a senha de outro chefe."); return; }
       if (f.dono && !ehDono()){ toast("Esse cadastro não pode ser alterado."); return; } { const sx=d.papel==="funcionario" ? [...m.querySelectorAll(".f-sx:checked")].map(x=>x.value) : []; d.setores=sx; d.setor=sx[0]||""; }
       if (!novo && f.id===me.id && (d.papel!=="chefe"||!d.ativo) && f.papel==="chefe" && S.funcionarios.filter(x=>x.papel==="chefe"&&x.ativo!==false).length<2){ toast("Precisa ficar pelo menos um chefe ativo."); return; }
       if (d.papel==="chefe" && !ehChefe() && !semChefe()){ toast("Só o chefe pode cadastrar outro chefe."); return; }
