@@ -542,6 +542,12 @@ const STATUS = {
   aguardando:{t:"Aguardando peça"}, pronta:{t:"Pronta"}, entregue:{t:"Entregue"}, cancelada:{t:"Cancelada"}
 };
 const ATIVAS = ["orcamento","aberta","execucao","aguardando","pronta"];
+/* ===== FASE DO SISTEMA =====
+   FASE 1 (agora): sem mecânicos. Só chefes, gerente e lojistas. A OS aprovada fica "Na oficina" até alguém marcar "Pronta".
+   FASE 2 (oficina): troque OFICINA para true e tudo dos mecânicos/setores volta (tela do mecânico, setores, caminho, produtividade). */
+const OFICINA = false;
+if (!OFICINA){ STATUS.aberta.t="🔧 Na oficina"; STATUS.execucao.t="🔧 Na oficina"; }
+const SO_OFICINA = ["semmec","parada","maq","carga","servsem","pecas","loj","aut","prob","imp"];
 const PAPEL = {chefe:"Chefe", gerente:"Gerente", lojista:"Lojista", funcionario:"Mecânico"};
 const cargo = f => !f || f.papel==="chefe" ? "" : (PAPEL[f.papel]||"");
 const VIEWS = {
@@ -565,6 +571,7 @@ const VIEWS = {
   notas:{t:"Notas fiscais", r:["chefe","gerente","lojista"]},
   hnotas:{t:"Histórico de notas", r:["chefe"]},
   despesas:{t:"Despesas e resultado", r:["chefe"]},
+  saidas:{t:"💸 Tudo que saiu", r:["chefe"]},
   auditoria:{t:"Registros e backup", r:["chefe"]},
   historico:{t:"Histórico geral", r:["chefe"]},
   equipe:{t:"Equipe", r:["chefe","gerente"]},
@@ -576,7 +583,8 @@ const VIEWS = {
   comprasdia:{t:"🧾 Compras feitas", r:["chefe","gerente"]},
   reclamacoes:{t:"📣 Reclamações do sistema", r:["chefe","gerente"]}
 };
-const NAV_PRINCIPAL = ["chefe","busca","agora","os","caixa","receber","clientes"];
+if (!OFICINA){ VIEWS.os.r=["chefe","gerente"]; ["produtividade","fichas","medidas"].forEach(k=>{ VIEWS[k].r=[]; }); }
+const NAV_PRINCIPAL = OFICINA ? ["chefe","busca","agora","os","caixa","receber","clientes"] : ["chefe","busca","os","agora","estoque","caixa","receber","saidas","clientes"];
 const NAV_GERENTE = ["agora","busca","os","caixa","notas","receber","estoque","clientes"];
 const HOLDER = "tab-" + Math.random().toString(36).slice(2);
 
@@ -890,7 +898,7 @@ function telaLogin(){
   }
   $("#root").innerHTML = `<div class="login"><div class="card">
     <div style="background:var(--side);color:var(--ink);margin:-16px -16px 0;padding:16px;border-radius:10px 10px 0 0;border-bottom:3px solid var(--accent)">${logoEmp()?`<img src="${logoEmp()}" alt="" style="display:block;max-width:180px;max-height:80px;object-fit:contain;margin-bottom:8px">`:""}<h1>${h(nomeEmp())} <span style="color:var(--accent)">●</span></h1><p class="muted" style="margin:8px 0 0">Quem está usando este computador?</p></div>
-    <div class="who">${listaWho.filter(f=>f.papel==="funcionario"||f.papel==="lojista"||f.papel==="logistica").sort((a,b)=>(a.papel==="lojista"?0:1)-(b.papel==="lojista"?0:1)).map(f=>`<button type="button" data-id="${f.id}" class="${loginSel===f.id?"on":""}">${avatar(f)}${h(f.nome)}<small>${h(PAPEL[f.papel]||"")}</small></button>`).join("")}</div>
+    <div class="who">${listaWho.filter(f=>(OFICINA&&f.papel==="funcionario")||f.papel==="lojista"||f.papel==="logistica").sort((a,b)=>(a.papel==="lojista"?0:1)-(b.papel==="lojista"?0:1)).map(f=>`<button type="button" data-id="${f.id}" class="${loginSel===f.id?"on":""}">${avatar(f)}${h(f.nome)}<small>${h(PAPEL[f.papel]||"")}</small></button>`).join("")}</div>
     ${mostraRestrito?`<button type="button" id="restrito" class="btn sm" style="align-self:flex-end;opacity:.75">🔒 Acesso restrito</button>`:""}
     <form id="flog" class="grid" ${loginSel?"":"hidden"}><label class="f">${loginSel==="__restrito"?"Senha do acesso restrito":`Senha de ${h((S.funcionarios.find(x=>x.id===loginSel)||{}).nome||"")}`}<input id="lp" class="pin" type="password" maxlength="20" autocomplete="off" autocapitalize="off"></label>
     <button type="submit" class="btn pri" style="width:100%;padding:14px;font-size:18px;justify-content:center">Entrar</button>
@@ -913,7 +921,7 @@ function telaLogin(){
     if (varios.length>1){ $("#lerr").innerHTML = `<div style="color:var(--ink);font-weight:600;margin-bottom:6px">Essa senha é de mais de uma pessoa. Quem é você?</div>${varios.map(x=>`<button type="button" class="btn" data-quem="${x.id}" style="margin:0 6px 6px 0;color:var(--ink)">${h(x.nome)} · ${h(PAPEL[x.papel]||"")}</button>`).join("")}`;
       $("#lerr").onclick=ev=>{ const b=ev.target.closest("[data-quem]"); if(!b) return; const g=varios.find(x=>x.id===b.dataset.quem); if (!g || $("#lp").value.trim()!==pin) return; logar(g, pin); };
       return; }
-    const f = loginSel==="__restrito" ? varios[0] : S.funcionarios.find(x=>x.id===loginSel && (x.papel==="funcionario"||x.papel==="lojista"||x.papel==="logistica"));
+    const f = loginSel==="__restrito" ? varios[0] : S.funcionarios.find(x=>x.id===loginSel && ((OFICINA&&x.papel==="funcionario")||x.papel==="lojista"||x.papel==="logistica"));
     if (f && await pinConfere(f, pin)){ logar(f, pin); }
     else { registrarAcesso(loginSel==="__restrito"?null:S.funcionarios.find(x=>x.id===loginSel), false); loginErros++; if (loginErros>=5){ loginTrava=Date.now()+60000; loginErros=0; $("#lerr").textContent="Muitas tentativas erradas. Espere 1 minuto."; } else $("#lerr").textContent = "Senha errada. Tente de novo."; $("#lp").value=""; }
   });
@@ -932,8 +940,17 @@ function atualizar(){
   if (modalRefresh) modalRefresh();
   barraVerComo();
 }
+/* LIMPEZA ÚNICA: a tabela de serviços começa vazia (o chefe cadastra tudo do zero). Roda uma vez só; depois nunca mais. */
+let limpezaFeita=false;
+async function limpezaUnicaPrecos(){ if (limpezaFeita || !me || !ehChefe()) return; limpezaFeita=true;
+  try{ const ref=db.doc("config/limpezas"), cf=await ref.get(); if (cf.exists && cf.data().precosZerados) return;
+    const r=await db.collection("precos").get(); let n=0; for (const d of r.docs){ await apagarComLixeira("precos/"+d.id, Object.assign({id:d.id}, d.data())); n++; }
+    await ref.set(Object.assign({}, cf.exists?cf.data():{}, {precosZerados:Date.now(), porNome:me.nome}));
+    if (n) toast(`🧹 Tabela de serviços zerada (${n}). Agora é só cadastrar os seus em Tabela de preços.`); }catch(e){ limpezaFeita=false; console.error("limpeza", e); } }
 function montar(){
   if (!me){ telaLogin(); return; }
+  setTimeout(limpezaUnicaPrecos, 2500);
+  if (me.papel==="funcionario" && !OFICINA){ forcarSaida("O acesso de mecânico está desligado nesta fase do sistema."); return; }
   if (me.papel==="funcionario"){ montarFunc(); return; }
   let v = (location.hash||"").slice(1);
   if (!pode(v)) v = inicio(me.papel);
@@ -1162,11 +1179,11 @@ SHELL.painel = () => `<div class="top"><h1>Painel</h1><button class="btn pri" id
   <div class="grid g2"><div class="card"><h2>OS por situação</h2><div id="p-status"></div></div>
   <div class="card"><h2>Estoque baixo</h2><div id="p-baixo"></div></div>
   <div class="card"><h2>Peças mais usadas (30 dias)</h2><div id="p-top"></div></div>
-  <div class="card" style="border-color:var(--accent)"><h2>Esperando sua autorização</h2><div id="p-rem"></div></div>
-  <div class="card"><h2>Pedidos da oficina</h2><div id="p-alertas"></div></div>
+  <div class="card" style="border-color:var(--accent);${OFICINA?"":"display:none"}"><h2>Esperando sua autorização</h2><div id="p-rem"></div></div>
+  <div class="card" style="${OFICINA?"":"display:none"}"><h2>Pedidos da oficina</h2><div id="p-alertas"></div></div>
   ${ehChefe()?`<div class="card"><h2>Prazos alterados (7 dias)</h2><div id="p-prazos"></div></div>`:""}
-  <div class="card"><h2>OS em andamento por setor</h2><div id="p-setor"></div></div>
-  <div class="card"><h2>Produção da equipe (mês)</h2><div id="p-equipe"></div></div></div>`;
+  <div class="card" style="${OFICINA?"":"display:none"}"><h2>OS em andamento por setor</h2><div id="p-setor"></div></div>
+  <div class="card" style="${OFICINA?"":"display:none"}"><h2>Produção da equipe (mês)</h2><div id="p-equipe"></div></div></div>`;
 BIND.painel = () => { $("#nova-os").onclick = ()=>formOS(); };
 FILL.painel = () => {
   const hoje = new Date(); hoje.setHours(0,0,0,0);
@@ -1177,7 +1194,7 @@ FILL.painel = () => {
   const entMes = S.os.filter(o=>o.status==="entregue" && (o.entregueEm||0)>=mes);
   const fatMes = entMes.reduce((s,o)=>s+totalOS(o),0) + S.vendas.filter(v=>v.em>=mes).reduce((s,v)=>s+(v.total||0),0);
   $("#p-tiles").innerHTML = [
-    ["accent", ativas.length, "OS em andamento"], ["ok", S.os.filter(esperaRemanejar).length, "Esperando autorização"], ["ok", S.os.filter(o=>o.status==="pronta").length, "Prontas para entregar"],
+    ["accent", ativas.length, "OS em andamento"], ...(OFICINA?[["ok", S.os.filter(esperaRemanejar).length, "Esperando autorização"]]:[["info", S.os.filter(o=>o.status==="orcamento").length, "Orçamentos esperando o cliente"]]), ["ok", S.os.filter(o=>o.status==="pronta").length, "Prontas para entregar"],
     ["warn", S.os.filter(o=>o.status==="aguardando").length, "Aguardando peça"], ["bad", baixo.length, "Peças com estoque baixo"], ["warn", S.os.filter(semNota).length + S.vendas.filter(vendaSemNota).length, "Esperando nota fiscal"],
   ].concat(ehChefe() ? [["info", money(vendHoje), "Vendas na loja hoje"], ["ok", money(fatMes), "Faturado no mês"]] : []).map(([c,v,l])=>`<div class="tile ${c}"><div class="v num">${v}</div><div class="l">${l}</div></div>`).join("");
   const cont = {}; S.os.forEach(o=>cont[o.status]=(cont[o.status]||0)+1);
@@ -1215,7 +1232,7 @@ function totalServ(o){ return (o.servicos||[]).reduce((s,x)=>s+sTot(x),0); }
 function totalOS(o){ return totalPecas(o)+totalServ(o)-(Number(o.desconto)||0); }
 SHELL.os = () => `<div class="top"><h1>Ordens de serviço</h1><button class="btn" id="imp-fila">🖨 Imprimir fila</button>${gerencia()?`<button class="btn pri" id="nova-os">Nova OS</button>`:""}</div>
   <div class="card"><div class="row" style="margin-bottom:10px">
-    <div class="seg" id="os-f">${[["ativas","Em aberto"],["pronta","Prontas"],["entregue","Entregues"],["todas","Todas"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${UI.osFiltro===k?"on":""}">${t}</button>`).join("")}</div>
+    <div class="seg" id="os-f">${(OFICINA?[["ativas","Em aberto"],["pronta","Prontas"],["entregue","Entregues"],["todas","Todas"]]:[["ativas","Em aberto"],["orcamento","📝 Orçamentos"],["naoficina","🔧 Na oficina"],["pronta","🏁 Prontas"],["entregue","Entregues"],["todas","Todas"]]).map(([k,t])=>`<button type="button" data-k="${k}" class="${UI.osFiltro===k?"on":""}">${t}</button>`).join("")}</div>
     <span class="spacer"></span><input id="os-b" type="search" placeholder="Buscar nº, cliente, motor, nº do motor, placa" value="${h(UI.osBusca)}" style="width:min(320px,100%)">
   </div>
   <div id="os-atr"></div><div id="os-imp"></div>
@@ -1234,17 +1251,17 @@ BIND.os = () => {
 const atrasoOS = o => { if (!["aberta","execucao","aguardando","pronta"].includes(o.status)) return 0; const d=diasParaPrazo(o); return d!==null && d<0 ? -d : 0; };
 function linhaOS(o){
   const at = atrasoOS(o);
-  return `<tr class="click ${at?"atrasada":""}" data-id="${o.id}"><td class="mono">${codOS(o)}</td><td>${at?`<span class="tag-atr">ATRASADA ${at} DIA${at>1?"S":""}</span><br>`:""}<span class="pill p-${o.status}">${STATUS[o.status]?.t||o.status}</span>${seloAss(o)}${o.prioridade==="urgente"?` <span class="chip-low">Urgente</span>`:""}${o.adiantadaEm?` <span class="pill p-execucao">⬆️ Adiantado</span>`:""}${esperaRemanejar(o)?` <span class="pill p-pronta">✅ Autorizar</span>`:""}${o.garantiaDe?` <span class="pill p-aguardando">🛡 Garantia</span>`:""}${estaDevendo(o)?` <span class="chip-low">💰 deve ${money(faltaPagar(o))}</span>`:""}${alertasAbertos(o).length?` <span class="chip-low">⚠️ ${alertasAbertos(o).length} pedido</span>`:""}${naFila(o)?(foiImpressa(o)?` <span class="muted" style="font-size:12px" title="Impressa em ${h(dt(o.impressa.em))}">🖨 impressa</span>`:` <span style="font-size:12px;color:var(--accent)">🖨 falta imprimir</span>`):""}</td>
-    <td>${h(o.cliente)}</td><td>${h(o.veiculo)}${o.motor?` <span class="muted">· ${h(o.motor)}</span>`:""}${o.numMotor?`<br><span class="muted mono" style="font-size:12px">Nº ${h(o.numMotor)}</span>`:""}</td><td>${h(o.linha==="pesada"?"Pesada":"Leve")}</td><td>${h(fnome(o.responsavel))}</td>
+  return `<tr class="click ${at?"atrasada":""}" data-id="${o.id}"><td class="mono">${codOS(o)}</td><td>${at?`<span class="tag-atr">ATRASADA ${at} DIA${at>1?"S":""}</span><br>`:""}<span class="pill p-${o.status}">${STATUS[o.status]?.t||o.status}</span>${seloAss(o)}${o.prioridade==="urgente"?` <span class="chip-low">Urgente</span>`:""}${o.adiantadaEm?` <span class="pill p-execucao">⬆️ Adiantado</span>`:""}${esperaRemanejar(o)?` <span class="pill p-pronta">✅ Autorizar</span>`:""}${o.garantiaDe?` <span class="pill p-aguardando">🛡 Garantia</span>`:""}${estaDevendo(o)?` <span class="chip-low">💰 deve ${money(faltaPagar(o))}</span>`:""}${alertasAbertos(o).length?` <span class="chip-low">⚠️ ${alertasAbertos(o).length} pedido</span>`:""}${OFICINA&&naFila(o)?(foiImpressa(o)?` <span class="muted" style="font-size:12px" title="Impressa em ${h(dt(o.impressa.em))}">🖨 impressa</span>`:` <span style="font-size:12px;color:var(--accent)">🖨 falta imprimir</span>`):""}</td>
+    <td>${h(o.cliente)}</td><td>${h(o.veiculo)}${o.motor?` <span class="muted">· ${h(o.motor)}</span>`:""}${o.numMotor?`<br><span class="muted mono" style="font-size:12px">Nº ${h(o.numMotor)}</span>`:""}</td><td>${h(nomeLinha(o.linha))}</td>${OFICINA?`<td>${h(fnome(o.responsavel))}</td>`:""}
     <td class="num">${dia(o.previsao)}${UI.osFiltro==="ativas"&&motivoFila(o).length?`<br><span style="font-size:12px;color:var(--accent)">${h(motivoFila(o).join(" · "))}</span>`:""}</td>${me.papel!=="funcionario"?`<td class="n">${money(totalOS(o))}</td>`:""}</tr>`;
 }
-const CAB_OS = () => `<tr><th>Nº</th><th>Situação</th><th>Cliente</th><th>Veículo / motor</th><th>Linha</th><th>Responsável</th><th>Previsão</th>${me.papel!=="funcionario"?`<th class="n">Total</th>`:""}</tr>`;
+const CAB_OS = () => `<tr><th>Nº</th><th>Situação</th><th>Cliente</th><th>Veículo / motor</th><th>Linha</th>${OFICINA?"<th>Responsável</th>":""}<th>Previsão</th>${me.papel!=="funcionario"?`<th class="n">Total</th>`:""}</tr>`;
 function htmlAntigas(q){ if (!q) return ""; const ant = UI.osAntigas && UI.osAntigas.q===q ? UI.osAntigas.l : null;
   return ant ? (ant.length?`<h3 style="margin:16px 0 6px">OS antigas encontradas</h3><table>${CAB_OS()}${ant.map(linhaOS).join("")}</table>`:`<div class="muted" style="margin-top:10px">Nenhuma OS antiga com “${h(q)}”.</div>`) : `<button class="btn sm" id="os-ant" style="margin-top:10px">🔎 Procurar também nas OS antigas</button>`; }
 function bindAntigas(q){ const ba=$("#os-ant"); if (ba) ba.onclick=async()=>{ ba.disabled=true; ba.textContent="Procurando…"; try{ UI.osAntigas={q, l:await buscarOSAntigas(UI.osBusca.trim())}; S.osExtras=(S.osExtras||[]).concat(UI.osAntigas.l); }catch(err){ erro(err); } FILL.os(); }; }
 FILL.os = () => {
   const q = UI.osBusca.trim().toLowerCase();
-  let l = S.os.filter(o => UI.osFiltro==="todas" || (UI.osFiltro==="ativas" ? ATIVAS.includes(o.status) : o.status===UI.osFiltro));
+  let l = S.os.filter(o => UI.osFiltro==="todas" || (UI.osFiltro==="ativas" ? ATIVAS.includes(o.status) : UI.osFiltro==="naoficina" ? ["aberta","execucao","aguardando"].includes(o.status) : o.status===UI.osFiltro));
   if (q) l = l.filter(o => [o.numero,codOS(o),o.cliente,o.veiculo,o.motor,o.numMotor,o.placa,o.problema].join(" ").toLowerCase().includes(q));
   const setores = S.setores.concat(l.some(o=>!o.setor||!S.setores.includes(o.setor))?[""]:[]);
   const nome = st => st || "Sem setor";
@@ -1254,11 +1271,12 @@ FILL.os = () => {
   const atr = S.os.filter(atrasoOS);
   $("#os-atr").innerHTML = atr.length && UI.osEscopo!=="atras" ? `<div class="banner bad" style="margin:0 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:5px solid var(--bad)"><span style="flex:1;font-size:16px">🔴 <b>${atr.length} OS atrasada${atr.length>1?"s":""}</b>: ${atr.sort((a,b)=>atrasoOS(b)-atrasoOS(a)).slice(0,6).map(o=>`${codOS(o)} (${atrasoOS(o)}d)`).join(" · ")}${atr.length>6?" …":""}</span><button class="btn sm" id="ver-atr" style="border-color:var(--bad)">Ver só as atrasadas</button></div>` : "";
   const va=$("#ver-atr"); if (va) va.onclick=()=>{ UI.osFiltro="ativas"; UI.osEscopo="atras"; montar(); };
-  $("#os-imp").innerHTML = fi.length<mi ? "" : `<div class="banner ${fi.length>=mi?"":"muted"}" style="margin:0 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap${fi.length>=mi?";border-color:var(--accent)":""}">
+  $("#os-imp").innerHTML = !OFICINA || fi.length<mi ? "" : `<div class="banner ${fi.length>=mi?"":"muted"}" style="margin:0 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap${fi.length>=mi?";border-color:var(--accent)":""}">
     <span style="flex:1">🖨 ${fi.length ? `<b>${fi.length} OS ainda não ${fi.length>1?"foram impressas":"foi impressa"}</b>` : "Todas as OS da fila já foram impressas"} · mínimo para imprimir: <b>${mi}</b>${fi.length>=mi?` · <b style="color:var(--accent)">já dá para imprimir</b>`:fi.length?` · faltam ${mi-fi.length}`:""}</span>
     ${fi.length?`<button class="btn sm ${fi.length>=mi?"pri":""}" id="imp-novas">Imprimir as novas</button>`:""}${direcao()?`<button class="btn sm" id="imp-min">Mudar mínimo</button>`:""}</div>`;
-  $("#os-st").innerHTML = [["","Todas juntas",l.length],["por","Separadas por setor",null]].map(([v,t,n])=>`<button type="button" class="chip ${UI.osEscopo===v?"on":""}" data-st="${v}">${t}${n!=null?` <b>${n}</b>`:""}</button>`).join("")
-    + (()=>{ const na=l.filter(atrasoOS).length; return na?`<button type="button" class="chip ${UI.osEscopo==="atras"?"on":""}" data-st="atras" style="border-color:var(--bad);${UI.osEscopo==="atras"?"background:var(--bad);color:#fff":"color:var(--bad)"}">🔴 Atrasadas <b style="color:inherit">${na}</b></button>`:""; })() + `<button type="button" class="chip ${UI.osEscopo==="naoimp"?"on":""}" data-st="naoimp">🖨 Falta imprimir <b>${fi.length}</b></button>` + `<span class="chipsep"></span>` + setores.map(st=>{ const n=daSetor(st).length; return `<button type="button" class="chip ${UI.osEscopo==="setor:"+st?"on":""}" data-st="setor:${h(st)}">${h(nome(st))} <b>${n}</b></button>`; }).join("");
+  $("#os-st").innerHTML = (OFICINA?[["","Todas juntas",l.length],["por","Separadas por setor",null]]:[["","Todas",l.length]]).map(([v,t,n])=>`<button type="button" class="chip ${UI.osEscopo===v?"on":""}" data-st="${v}">${t}${n!=null?` <b>${n}</b>`:""}</button>`).join("")
+    + (()=>{ const na=l.filter(atrasoOS).length; return na?`<button type="button" class="chip ${UI.osEscopo==="atras"?"on":""}" data-st="atras" style="border-color:var(--bad);${UI.osEscopo==="atras"?"background:var(--bad);color:#fff":"color:var(--bad)"}">🔴 Atrasadas <b style="color:inherit">${na}</b></button>`:""; })() + (!OFICINA ? "" : `<button type="button" class="chip ${UI.osEscopo==="naoimp"?"on":""}" data-st="naoimp">🖨 Falta imprimir <b>${fi.length}</b></button>` + `<span class="chipsep"></span>` + setores.map(st=>{ const n=daSetor(st).length; return `<button type="button" class="chip ${UI.osEscopo==="setor:"+st?"on":""}" data-st="setor:${h(st)}">${h(nome(st))} <b>${n}</b></button>`; }).join(""));
+  if (!OFICINA && UI.osEscopo && !["","atras"].includes(UI.osEscopo)) UI.osEscopo="";
   const ordena = x => UI.osFiltro==="ativas" ? x.slice().sort(ordemFila) : x;
   const vazio = `<div class="empty">${S.os.length? "Nenhuma OS com esse filtro." : (gerencia()? "Nenhuma OS ainda. Clique em Nova OS para abrir a primeira." : "Nenhuma OS ainda.")}</div>`;
   if (UI.osEscopo==="por"){
@@ -1289,7 +1307,7 @@ function formOS(o){
     <label class="f">Motor<input id="o-mot" value="${h(o.motor)}" placeholder="Ex.: DC13, AP 1.6, OM 926"></label>
     <label class="f">Nº do motor<input id="o-nmot" value="${h(o.numMotor)}" placeholder="Ex.: 926910U0712345"></label>
     ${novo?`<div class="wide" id="o-gar"></div>`:""}
-    <label class="f">Linha<select id="o-lin"><option value="leve" ${o.linha!=="pesada"?"selected":""}>Leve</option><option value="pesada" ${o.linha==="pesada"?"selected":""}>Pesada</option></select></label>
+    <label class="f">Linha<select id="o-lin">${LINHAS.map(([k,t])=>`<option value="${k}" ${(o.linha||"leve")===k?"selected":""}>${t}</option>`).join("")}</select></label>
     <label class="f" ${ehLojista()?"hidden":""}>Responsável<select id="o-res"><option value="">— definir depois —</option>${resp.map(f=>`<option value="${f.id}" ${o.responsavel===f.id?"selected":""}>${h(f.nome)}</option>`).join("")}</select></label>
     <label class="f" ${ehLojista()?"hidden":""}>Setor${novo?" inicial":""}<select id="o-set"><option value="">— definir depois —</option>${S.setores.map(x=>`<option ${o.setor===x?"selected":""}>${h(x)}</option>`).join("")}</select></label>
     <label class="f" ${ehLojista()?"hidden":""}>Ficha de medidas<select id="o-fic"><option value="">— nenhuma —</option>${S.fichas.slice().sort((a,b)=>a.motor.localeCompare(b.motor)).map(f=>`<option value="${f.id}" ${(o.fichaId||fichaDaOS(o)?.id)===f.id?"selected":""}>${h(f.motor)}</option>`).join("")}</select></label>
@@ -1345,6 +1363,7 @@ const TRANS = {
   orcamento:["aberta","cancelada"], aberta:["execucao","aguardando","cancelada"], execucao:["aguardando","pronta"],
   aguardando:["execucao"], pronta:["execucao","entregue"], entregue:[], cancelada:["orcamento"]
 };
+if (!OFICINA) Object.assign(TRANS, {aberta:["pronta","aguardando","cancelada"], execucao:["pronta","aguardando"], aguardando:["aberta","pronta"], pronta:["aberta","entregue"]});
 function podeStatus(para){
   if (me.papel==="funcionario") return ["execucao","aguardando","pronta"].includes(para);
   if (me.papel==="lojista") return para==="cancelada" || para==="aberta" || para==="entregue";
@@ -1554,17 +1573,17 @@ function fillOSDet(){
   const verPreco = me.papel!=="funcionario";
   $("#d-tit").innerHTML = `OS <span class="mono" style="font-size:24px">${codOS(o)}</span> <span class="pill p-${o.status}" style="vertical-align:middle">${STATUS[o.status]?.t}</span>${seloAss(o, true)}`;
   const trav = !!o.notaOk;
-  const dc=$("#d-circ"); if (dc) dc.innerHTML = htmlCircuito(o) + htmlCaminho(o) + htmlBotoesPeca(o) + (precisaReaprovar(o)?`<div class="banner bad" style="margin:8px 0 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">⚠️ Entrou coisa a mais depois da aprovação: o total passou de <b>${money(valorAprovado(o))}</b> para <b>${money(totalOS(o))}</b>. O cliente precisa aprovar de novo.</span>${foneWa(o.telefone)&&(direcao()||ehLojista())?`<button class="btn sm" id="d-wad">💬 Pedir aprovação</button>`:""}<button class="btn sm pri" id="d-reap">✅ Cliente aprovou</button></div>`:"");
+  const dc=$("#d-circ"); if (dc) dc.innerHTML = (OFICINA ? htmlCircuito(o) + htmlCaminho(o) + htmlBotoesPeca(o) : "") + (precisaReaprovar(o)?`<div class="banner bad" style="margin:8px 0 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">⚠️ Entrou coisa a mais depois da aprovação: o total passou de <b>${money(valorAprovado(o))}</b> para <b>${money(totalOS(o))}</b>. O cliente precisa aprovar de novo.</span>${foneWa(o.telefone)&&(direcao()||ehLojista())?`<button class="btn sm" id="d-wad">💬 Pedir aprovação</button>`:""}<button class="btn sm pri" id="d-reap">✅ Cliente aprovou</button></div>`:"");
   if (dc) dc.onclick=e=>{ const pg=e.target.closest("[data-pgp]"); if (pg){ paginaPeca(o.id, pg.dataset.pgp||null); return; } const r=e.target.closest("[data-cm-rec]"); if (r){ formRecusou(o); return; } const st=e.target.closest("[data-cm-set]"); if (st){ formMandarPeca(o, st.dataset.cmSet); return; } const sp=e.target.closest("[data-cm-sep]"); if (sp){ formSepararUnidade(o, sp.dataset.cmSep); } };
   const wad=$("#d-wad"); if (wad) wad.onclick=()=>menuWhats(o,"adicional"); const reap=$("#d-reap"); if (reap) reap.onclick=()=>formAprovacao(o);
   const prox = (TRANS[o.status]||[]).filter(podeStatus).filter(s=>!(trav && ["execucao","aguardando","cancelada"].includes(s)));
-  $("#d-acts").innerHTML = prox.map(s=>`<button class="btn ${s==="pronta"||s==="entregue"||s==="aberta"||s==="execucao"?"pri":""} ${s==="cancelada"?"danger":""}" data-st="${s}">${{aberta:"✅ Cliente aprovou · Lançar OS",execucao:"Iniciar / retomar",aguardando:"Aguardando peça",pronta:"Marcar como pronta",entregue:"Entregar ao cliente",cancelada:"Cancelar OS",orcamento:"Reabrir como orçamento"}[s]}</button>`).join("")
-    + ((direcao() && ["orcamento","aberta"].includes(o.status) || ehLojista() && o.status==="aberta") && !liberada(o) ? `<button class="btn pri" id="d-lib">🔧 Mandar para a oficina</button>` : "")
+  $("#d-acts").innerHTML = prox.map(s=>`<button class="btn ${s==="pronta"||s==="entregue"||s==="aberta"||s==="execucao"?"pri":""} ${s==="cancelada"?"danger":""}" data-st="${s}">${{aberta:o.status==="orcamento"?"✅ Cliente aprovou · Lançar OS":"🔧 Voltou para a oficina",execucao:"Iniciar / retomar",aguardando:"⏸ Aguardando peça",pronta:"🏁 Marcar como pronta",entregue:"Entregar ao cliente",cancelada:"Cancelar OS",orcamento:"Reabrir como orçamento"}[s]}</button>`).join("")
+    + (OFICINA && (direcao() && ["orcamento","aberta"].includes(o.status) || ehLojista() && o.status==="aberta") && !liberada(o) ? `<button class="btn pri" id="d-lib">🔧 Mandar para a oficina</button>` : "")
     + (direcao()||ehLojista()?`<button class="btn" id="d-wa">💬 WhatsApp</button>`:"") + `<button class="btn" id="d-mais">⋯ Mais</button>`;
-  $("#d-kv").innerHTML = [["Cliente",o.cliente],["Telefone",o.telefone||"—"],["Veículo",o.veiculo||"—"],["Placa",o.placa||"—"],["Motor",o.motor||"—"],["Nº do motor",String(o.numMotor||"—").toUpperCase()],["Linha",o.linha==="pesada"?"Pesada":"Leve"],
+  $("#d-kv").innerHTML = [["Cliente",o.cliente],["Telefone",o.telefone||"—"],["Veículo",o.veiculo||"—"],["Placa",o.placa||"—"],["Motor",o.motor||"—"],["Nº do motor",String(o.numMotor||"—").toUpperCase()],["Linha",nomeLinha(o.linha)],
     ["Aberta por",(o.criadoPorNome||fnome(o.criadoPor)||"—")+(o.criadoEm?` · ${dt(o.criadoEm)}`:"")],["Setor atual",o.setor||"—"],["Responsável",fnome(o.responsavel)],["Prioridade",o.prioridade==="urgente"?"Urgente":"Normal"],["Previsão",dia(o.previsao)+((o.prazoAlteracoes||[]).length?` (prazo alterado ${(o.prazoAlteracoes||[]).length}×)`:"")],...(me.papel!=="funcionario"&&(o.notaOk||["pronta","entregue"].includes(o.status))?[["Nota fiscal", o.notaOk?([o.nfServico&&"Serv. "+o.nfServico, o.nfPecas&&"Peças "+o.nfPecas].filter(Boolean).join(" · ")||"Sem nota"):"Pendente"]]:[]),["Aberta em",dt(o.criadoEm)]]
-    .filter(([k])=>["Cliente","Telefone","Motor","Nº do motor","Setor atual","Previsão","Nota fiscal","Aberta por"].includes(k)).map(([k,v])=>`<div><span>${k}</span>${h(v)}</div>`).join("")
-    + `<details style="grid-column:1/-1"><summary class="muted" style="cursor:pointer;font-size:13px">Mais dados (veículo, placa, linha, responsável…)</summary><div class="kv" style="margin-top:8px">${[["Veículo",o.veiculo||"—"],["Placa",o.placa||"—"],["Linha",o.linha==="pesada"?"Pesada":"Leve"],["Responsável",fnome(o.responsavel)],["Prioridade",o.prioridade==="urgente"?"Urgente":"Normal"],["Aberta em",dt(o.criadoEm)]].map(([k,v])=>`<div><span>${k}</span>${h(v)}</div>`).join("")}</div></details>`;
+    .filter(([k])=>["Cliente","Telefone","Motor","Nº do motor",...(OFICINA?["Setor atual"]:[]),"Previsão","Nota fiscal","Aberta por"].includes(k)).map(([k,v])=>`<div><span>${k}</span>${h(v)}</div>`).join("")
+    + `<details style="grid-column:1/-1"><summary class="muted" style="cursor:pointer;font-size:13px">Mais dados (veículo, placa, linha, responsável…)</summary><div class="kv" style="margin-top:8px">${[["Veículo",o.veiculo||"—"],["Placa",o.placa||"—"],["Linha",nomeLinha(o.linha)],["Responsável",fnome(o.responsavel)],["Prioridade",o.prioridade==="urgente"?"Urgente":"Normal"],["Aberta em",dt(o.criadoEm)]].map(([k,v])=>`<div><span>${k}</span>${h(v)}</div>`).join("")}</div></details>`;
   const cc = o.status==="cancelada" && o.cancelamento;
   $("#d-pro").innerHTML = (cc?`<div class="banner bad" style="margin:0 0 10px">❌ Cancelada por ${h(cc.porNome)} em ${dt(cc.em)} · <b>${h(cc.motivo)}</b> · ${h(cc.texto)}</div>`:"") + (o.problema ? `<div class="muted" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Problema / serviço solicitado</div><div style="white-space:pre-wrap">${h(o.problema)}</div>` : "");
   const edS = podeServicos(o);
@@ -1580,7 +1599,7 @@ function fillOSDet(){
   const ss=$("#se-sel"), sk=S.setores.join("|")+"#"+(o.setor||"");
   if (ss.dataset.k!==sk){ ss.innerHTML = S.setores.length ? S.setores.map(x=>`<option ${x===o.setor?"disabled":""} value="${h(x)}">${h(x)}${x===o.setor?" (atual)":""}</option>`).join("") : `<option value="">Nenhum setor cadastrado</option>`;
     const i=S.setores.indexOf(o.setor); ss.value = S.setores[i+1] || S.setores.find(x=>x!==o.setor) || ""; ss.dataset.k=sk; }
-  $("#f-setor").style.display = ["entregue","cancelada"].includes(o.status) || ehLojista() ? "none" : "";
+  $("#f-setor").style.display = !OFICINA || ["entregue","cancelada"].includes(o.status) || ehLojista() ? "none" : "";
   const fe = $("#f-peca"); fe.style.display = ["entregue","cancelada"].includes(o.status) || trav ? "none" : "";
   const fsv = $("#f-serv"); if (fsv) fsv.style.display = trav ? "none" : "";
   let tb = $("#d-trava"); if (!tb){ tb=document.createElement("div"); tb.id="d-trava"; $("#d-grid").before(tb); }
@@ -1723,7 +1742,7 @@ function formPrateleiras(){
 SHELL.estoque = () => `<div class="top"><h1>Estoque de peças</h1><span class="spacer"></span>${direcao()?`<button class="btn" id="e-prat">🗄️ Mapa das prateleiras</button> `:""}<button class="btn" id="e-saida">📤 Saída de peça</button> <button class="btn pri" id="nova-p">Cadastrar peça</button></div>
   ${direcao()&&!prateleiras().length?`<div class="banner" style="margin:0 0 12px">Monte o <b>mapa das prateleiras</b>: diga quais prateleiras tem na loja e no depósito e que tipo de peça fica em cada uma. <button class="btn sm pri" id="e-prat2">Montar agora</button></div>`:""}
   <div class="card"><div class="row" style="margin-bottom:12px">
-    <div class="seg" id="e-l">${[["todas","Todas"],["leve","Linha leve"],["pesada","Linha pesada"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${UI.estLinha===k?"on":""}">${t}</button>`).join("")}</div>
+    <div class="seg" id="e-l">${[["todas","Todas"],...LINHAS.map(([k,t])=>[k,"Linha "+t.toLowerCase().replace("scania","Scania")])].map(([k,t])=>`<button type="button" data-k="${k}" class="${UI.estLinha===k?"on":""}">${t}</button>`).join("")}</div>
     <label class="row" style="gap:6px;font-weight:600"><input type="checkbox" id="e-b" ${UI.estBaixo?"checked":""}> Só estoque baixo</label>
     <span class="spacer"></span><input id="e-q" type="search" placeholder="Buscar código, peça, aplicação, marca" value="${h(UI.estBusca)}" style="width:min(320px,100%)"></div>
     <div class="row" id="e-tipos" style="gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
@@ -1799,7 +1818,7 @@ FILL.estoque = () => {
   $("#e-lista").innerHTML = (l.length ? `<table><tr><th>Código</th><th>Peça</th><th>Aplicação</th><th>Linha</th><th>Local</th><th class="n">Qtd</th><th class="n">Mín.</th><th class="n">Custo</th><th class="n">Venda</th><th></th></tr>
     ${l.map(p=>{ const g=chave(p), cab = org!=="lista" && g!==grupoAtual ? (grupoAtual=g, `<tr class="grp"><td colspan="10">${org==="tipo"?icTipo(g)+" ":"🗄️ "}<b>${h(g)}</b>${org==="tipo"&&pratDoTipo(g)?` <span class="muted">· fica em ${h(pratDoTipo(g).area)} · Prateleira ${h(pratDoTipo(g).nome)}</span>`:""}${org==="local"?(()=>{ const pr=prateleiras().find(x=>g===`${x.area} · Prateleira ${x.nome}`); return pr&&pr.tipos.length?` <span class="muted">· ${pr.tipos.map(h).join(", ")}</span>`:""; })():""} <span class="muted">· ${l.filter(x=>chave(x)===g).length} peça(s)</span></td></tr>`) : "";
       return cab + (()=>{ const low=(p.qtd||0)<=(p.minimo||0); return `<tr><td class="mono">${h(p.codigo)}</td><td><b>${h(p.nome)}</b>${p.marca?` <span class="muted">${h(p.marca)}</span>`:""}</td><td class="muted">${h(p.aplicacao)}</td>
-    <td>${{leve:"Leve",pesada:"Pesada"}[p.linha]||"Ambas"}</td><td class="muted">${h(ondeFica(p))}</td><td class="n">${low?`<span class="chip-low">${p.qtd||0}</span>`:(p.qtd||0)} <span class="muted">${h(p.unidade||"un")}</span></td><td class="n">${p.minimo||0}</td>
+    <td>${{leve:"Leve",pesada:"Pesada",scania:"Scania"}[p.linha]||"Ambas"}</td><td class="muted">${h(ondeFica(p))}</td><td class="n">${low?`<span class="chip-low">${p.qtd||0}</span>`:(p.qtd||0)} <span class="muted">${h(p.unidade||"un")}</span></td><td class="n">${p.minimo||0}</td>
     <td class="n">${money(p.custo)}</td><td class="n">${money(p.preco)}</td><td class="n" style="white-space:nowrap"><button class="btn sm" data-a="ent" data-id="${p.id}">Entrada</button> <button class="btn sm" data-a="aj" data-id="${p.id}">Ajustar</button> <button class="btn sm" data-a="ed" data-id="${p.id}">Editar</button> <button class="btn sm" data-a="hist" data-id="${p.id}">Histórico</button></td></tr>`; })(); }).join("")}</table>`
     : `<div class="empty">${S.pecas.length?"Nenhuma peça com esse filtro.":"Nenhuma peça cadastrada. Clique em Cadastrar peça."}</div>`)
     + `<p class="muted" style="margin:10px 0 0;font-size:13px">${S.pecas.length} peças cadastradas${ehChefe()?` · valor em estoque (custo): <b class="num">${money(valor)}</b>`:""}</p>`;
@@ -1815,7 +1834,7 @@ function formPeca(p){
     <label class="f wide">Nome da peça<input id="p-nom" required value="${h(p.nome)}" placeholder="Ex.: Jogo de bronzinas de biela 0,25"></label>
     <label class="f wide">Aplicação (motores)<input id="p-apl" value="${h(p.aplicacao)}" placeholder="Ex.: MWM 6.10, Cummins ISB"></label>
     <label class="f">Marca<input id="p-mar" value="${h(p.marca)}"></label>
-    <label class="f">Linha<select id="p-lin">${[["ambas","Ambas"],["leve","Leve"],["pesada","Pesada"]].map(([k,t])=>`<option value="${k}" ${p.linha===k?"selected":""}>${t}</option>`).join("")}</select></label>
+    <label class="f">Linha<select id="p-lin">${[["ambas","Todas as linhas"],...LINHAS].map(([k,t])=>`<option value="${k}" ${p.linha===k?"selected":""}>${t}</option>`).join("")}</select></label>
     <label class="f">Tipo de peça<select id="p-tip">${TIPOS_PECA.map(([t,ic])=>`<option value="${h(t)}" ${(p.tipo||(p.nome?tipoDaPeca(p):""))===t?"selected":""}>${ic} ${h(t)}</option>`).join("")}</select></label>
     <label class="f">Onde fica (área)<input id="p-are" list="dl-pare" value="${h(p.area||"")}" placeholder="Loja ou Depósito"></label><datalist id="dl-pare">${areasTodas().map(a=>`<option value="${h(a)}">`).join("")}</datalist>
     <label class="f">Prateleira<input id="p-pra" list="dl-ppra" value="${h(p.prateleira||"")}" placeholder="Ex.: A" style="text-transform:uppercase"></label><datalist id="dl-ppra">${prateleiras().map(x=>`<option value="${h(x.nome)}">${h(x.area)}</option>`).join("")}</datalist>
@@ -2154,25 +2173,76 @@ function formCli(c){
   const novo=!c; c=c||{};
   abrirModal(`<h2>${novo?"Cadastrar cliente":"Editar cliente"}</h2><form id="fc" class="form">
     <label class="f wide">Nome / empresa<input id="c-n" required value="${h(c.nome)}"></label><label class="f">Telefone / WhatsApp<input id="c-t" value="${h(c.telefone)}"></label><label class="f">E-mail<input id="c-e" type="email" value="${h(c.email||"")}"></label>
-    <label class="f">Tipo de cliente<select id="c-tp">${Object.entries(TIPOS_CLI).map(([k,t])=>`<option value="${k}" ${tipoCli(c)===k?"selected":""}>${t}</option>`).join("")}</select></label><label class="f">Prioridade<span style="display:flex;align-items:center;gap:8px;min-height:40px"><input type="checkbox" id="c-pri" style="width:22px;height:22px" ${c.prioritario?"checked":""} ${direcao()?"":"disabled"}> ⭐ Cliente prioritário</span>${direcao()?"":`<small class="muted">Só o gerente ou o chefe marca.</small>`}</label><label class="f">CPF / CNPJ<input id="c-d" value="${h(c.doc)}"></label><label class="f">Cidade<input id="c-c" value="${h(c.cidade)}"></label>
+    <label class="f">Tipo de cliente<select id="c-tp">${Object.entries(TIPOS_CLI).map(([k,t])=>`<option value="${k}" ${tipoCli(c)===k?"selected":""}>${t}</option>`).join("")}</select></label><label class="f">Prioridade<span style="display:flex;align-items:center;gap:8px;min-height:40px"><input type="checkbox" id="c-pri" style="width:22px;height:22px" ${c.prioritario?"checked":""} ${direcao()?"":"disabled"}> ⭐ Cliente prioritário</span>${direcao()?"":`<small class="muted">Só o gerente ou o chefe marca.</small>`}</label>${htmlDadosCli(c,"c")}
+    ${!novo?`<div class="f wide"><b>🚗 Carros</b><div id="c-car" style="margin-top:4px">${(c.veiculos||[]).map((v,i)=>`<span class="chip" style="margin:0 6px 6px 0">${h(descCarro(v))} <button type="button" data-rmcar="${i}" title="Tirar" style="border:0;background:none;color:var(--bad);cursor:pointer">✕</button></span>`).join("")||`<span class="muted">Nenhum carro cadastrado.</span>`}</div><button type="button" class="btn sm" id="c-ncar" style="margin-top:4px">＋ Cadastrar carro</button></div>`:""}
     <label class="f wide">Observações<textarea id="c-o" rows="2">${h(c.obs)}</textarea></label>
     <div class="acts wide">${!novo&&direcao()?`<button type="button" class="btn danger" id="c-lgpd">Apagar dados do cliente (LGPD)</button><span class="spacer"></span>`:""}<button type="button" class="btn" id="c-can">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{ maskFone($("#c-t",m));
     const lg=$("#c-lgpd",m); if (lg) lg.onclick=()=>confirmar(`Apagar os dados pessoais de ${c.nome}? O nome e o telefone somem do cadastro e das OS. As OS ficam só com o número e os valores (parte fiscal). Use só se o cliente pedir.`, async()=>{ try{ await anonimizarCliente(c); fecharModal(); }catch(err){ erro(err); } }); 
     $("#c-can",m).onclick=fecharModal;
-    $("#fc",m).onsubmit=async e=>{ e.preventDefault(); const d={nome:$("#c-n",m).value.trim(), tipo:$("#c-tp",m).value, telefone:$("#c-t",m).value.trim(), email:$("#c-e",m).value.trim(), doc:$("#c-d",m).value.trim(), cidade:$("#c-c",m).value.trim(), obs:$("#c-o",m).value.trim(), prioritario:direcao()?$("#c-pri",m).checked:!!c.prioritario, atualizadoEm:Date.now()};
-      if (!novo && !direcao()){ toast("Depois de cadastrado, só o gerente (ou o chefe) altera os dados do cliente. Peça ao gerente."); return; }
+    ligarDadosCli(m, "c");
+    const nc=$("#c-ncar",m); if (nc) nc.onclick=()=>{ fecharModal(); formCarro(c, ()=>formCli(S.clientes.find(x=>x.id===c.id)||c)); };
+    const cc=$("#c-car",m); if (cc) cc.onclick=async e=>{ const b=e.target.closest("[data-rmcar]"); if(!b) return; const L=(c.veiculos||[]).slice(); L.splice(+b.dataset.rmcar,1); try{ await db.doc("clientes/"+c.id).update({veiculos:L}); c.veiculos=L; b.closest(".chip").remove(); toast("Carro tirado"); }catch(err){ erro(err); } };
+    $("#fc",m).onsubmit=async e=>{ e.preventDefault(); const dc=lerDadosCli(m,"c"); const d={nome:$("#c-n",m).value.trim(), tipo:$("#c-tp",m).value, telefone:$("#c-t",m).value.trim(), email:$("#c-e",m).value.trim(), pessoa:dc.pessoa, doc:dc.doc, endereco:dc.endereco, cidade:dc.endereco.cidade, obs:$("#c-o",m).value.trim(), prioritario:direcao()?$("#c-pri",m).checked:!!c.prioritario, atualizadoEm:Date.now()};
+      const fl=faltaDadosCli(d); if (fl.length){ toast("Falta: "+fl.join(", ")); return; }
+      if (!novo && !direcao()){ const so=["nome","telefone","email","obs"].every(k=>String(d[k]??"").trim()===String(c[k]??"").trim()) && d.tipo===tipoCli(c) && (!c.doc || c.doc===d.doc);
+        if (!so){ toast("Depois de cadastrado, só o gerente (ou o chefe) altera os dados do cliente. Você pode só completar o CPF e o endereço que faltavam."); return; } }
       const dup = clienteRepetido(d, c.id);
       if (dup && !$("#fc",m).dataset.dupok){ $("#fc",m).dataset.dupok="1"; toast(`⚠️ Já existe ${dup.nome}${dup.telefone?" · "+dup.telefone:""}. Se for outra pessoa, toque em Salvar de novo.`); return; }
       if (dup && $("#fc",m).dataset.dupok) d.naoJuntar=true;
-      try{ if(novo){ d.criadoEm=Date.now(); d.criadoPorNome=me.nome; await db.collection("clientes").add(d); }
+      try{ if(novo){ d.criadoEm=Date.now(); d.criadoPorNome=me.nome; d.veiculos=[]; const r=await db.collection("clientes").add(d); fecharModal(); toast("Cliente salvo · agora o carro 🚗"); formCarro(Object.assign({id:r.id}, d)); return; }
         else { if (!(await conferirVersao("clientes/"+c.id, c))) return; d.atualizadoPorNome=me.nome; await db.doc("clientes/"+c.id).update(d); auditar("Clientes", d.nome, c, Object.assign({}, c, d));
           if (d.nome!==c.nome || d.telefone!==(c.telefone||"")) propagarCliente(c.id, d.nome, d.telefone);
           avisarChefeCliente(c, d); }
-        fecharModal(); toast("Cliente salvo"); }catch(err){ erro(err); } };
+        fecharModal(); toast("Cliente salvo"); setTimeout(()=>{ if (UI.nv && $("#nv-cli")){ nvRenderCli(); nvAtualiza(); } }, 700); }catch(err){ erro(err); } };
   });
 }
 /* ---- integridade: clientes repetidos, versão, propagar ---- */
 const digitos = t => String(t||"").replace(/\D/g,"").replace(/^55(?=\d{10,11}$)/,"");
+/* ===== Cadastro do cliente: CPF (pessoa) ou CNPJ (empresa) + endereço são obrigatórios ===== */
+const UFS="AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
+function htmlDadosCli(v, px){ const pj=v.pessoa==="J", e=v.endereco||{};
+  return `<div class="f wide"><span>O cliente é *</span><div class="seg" id="${px}-pes" style="margin-top:4px"><button type="button" data-p="F" class="${pj?"":"on"}">👤 Pessoa (CPF)</button><button type="button" data-p="J" class="${pj?"on":""}">🏢 Empresa (CNPJ)</button></div></div>
+  <label class="f"><span id="${px}-docl">${pj?"CNPJ da empresa (opcional)":"CPF *"}</span><input id="${px}-doc" inputmode="numeric" value="${h(v.doc||"")}" placeholder="${pj?"00.000.000/0000-00":"000.000.000-00"}"></label>
+  <label class="f"><span id="${px}-cepl" data-t="CEP">CEP${pj?"":" *"}</span> <small class="muted">(preenche a rua sozinho)</small><input id="${px}-cep" inputmode="numeric" value="${h(e.cep||"")}" placeholder="00000-000"></label>
+  <label class="f meia"><span id="${px}-rual" data-t="Rua / avenida">Rua / avenida${pj?"":" *"}</span><input id="${px}-rua" value="${h(e.rua||"")}"></label>
+  <label class="f"><span id="${px}-nrol" data-t="Número">Número${pj?"":" *"}</span><input id="${px}-nro" value="${h(e.numero||"")}" placeholder="ou S/N"></label>
+  <label class="f"><span id="${px}-bail" data-t="Bairro">Bairro${pj?"":" *"}</span><input id="${px}-bai" value="${h(e.bairro||"")}"></label>
+  <label class="f"><span id="${px}-cidl" data-t="Cidade">Cidade${pj?"":" *"}</span><input id="${px}-cid" value="${h(e.cidade||v.cidade||"")}"></label>
+  <label class="f">Estado *<select id="${px}-uf">${UFS.map(u=>`<option ${(e.uf||"CE")===u?"selected":""}>${u}</option>`).join("")}</select></label>
+  <label class="f meia">Complemento / referência<input id="${px}-cmp" value="${h(e.comp||"")}"></label>`; }
+function lerDadosCli(m, px){ const g=k=>(($("#"+px+"-"+k,m)||{}).value||"").trim(); const pb=$("#"+px+"-pes .on",m);
+  return {pessoa:pb?pb.dataset.p:"F", doc:fmtDoc(g("doc")), endereco:{cep:g("cep"), rua:g("rua"), numero:g("nro"), bairro:g("bai"), cidade:g("cid"), uf:g("uf")||"CE", comp:g("cmp")}}; }
+function faltaDadosCli(d){ const f=[], pj=d.pessoa==="J", dg=String(d.doc||"").replace(/\D/g,""), e=d.endereco||{};
+  if (pj) return (dg && (!docValido(dg) || dg.length!==14)) ? ["CNPJ válido (confira os números) ou deixe em branco"] : [];  /* empresa: nada obrigatório */
+  if (!dg) f.push(pj?"CNPJ":"CPF"); else if (!docValido(dg) || dg.length!==(pj?14:11)) f.push((pj?"CNPJ":"CPF")+" válido (confira os números)");
+  if (String(e.cep||"").replace(/\D/g,"").length!==8) f.push("CEP");
+  [["rua","rua"],["numero","número da casa"],["bairro","bairro"],["cidade","cidade"]].forEach(([k,t])=>{ if (!e[k]) f.push(t); }); return f; }
+const cadastroIncompleto = c => !!c && !c.anonimizado && faltaDadosCli({pessoa:c.pessoa||"F", doc:c.doc, endereco:c.endereco||{cidade:c.cidade}}).length>0;
+function ligarDadosCli(m, px, aoMudar){ const ch=()=>{ if (aoMudar) aoMudar(lerDadosCli(m, px)); };
+  $("#"+px+"-pes",m).onclick=e=>{ const b=e.target.closest("[data-p]"); if(!b) return; $("#"+px+"-pes",m).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); const pj=b.dataset.p==="J";
+    $("#"+px+"-docl",m).textContent = pj?"CNPJ da empresa (opcional)":"CPF *"; m.querySelectorAll(`#${px}-cepl,#${px}-rual,#${px}-nrol,#${px}-bail,#${px}-cidl`).forEach(x=>{ x.textContent = x.dataset.t + (pj?"":" *"); }); $("#"+px+"-doc",m).placeholder = pj?"00.000.000/0000-00":"000.000.000-00"; ch(); };
+  m.querySelectorAll(`[id^="${px}-"]`).forEach(i=>{ if (i.matches("input,select")) i.addEventListener("input", ch); });
+  const dc=$("#"+px+"-doc",m); dc.addEventListener("blur", ()=>{ dc.value=fmtDoc(dc.value); ch(); });
+  const cep=$("#"+px+"-cep",m); cep.addEventListener("input", async()=>{ const d=cep.value.replace(/\D/g,"").slice(0,8); cep.value = d.length>5?d.slice(0,5)+"-"+d.slice(5):d; if (d.length!==8) return;
+    try{ const r=await fetch(`https://viacep.com.br/ws/${d}/json/`); const j=await r.json(); if (j.erro) { toast("CEP não encontrado. Preencha o endereço."); return; }
+      const put=(k,v)=>{ const i=$("#"+px+"-"+k,m); if (i && v && !i.value.trim()) i.value=v; }; put("rua", j.logradouro); put("bai", j.bairro); put("cid", j.localidade); if (j.uf) $("#"+px+"-uf",m).value=j.uf; ch(); const nu=$("#"+px+"-nro",m); if (nu && !nu.value) nu.focus(); }catch(e){} }); }
+/* ===== Carros do cliente ===== */
+const descCarro = v => [v.veiculo, v.placa, v.motor].filter(Boolean).join(" · ") || "carro";
+function formCarro(c, depois){ if (!c) return;
+  abrirModal(`<h2>🚗 Cadastrar o carro de ${h(c.nome)}</h2><p class="muted" style="margin:0 0 8px">Fica salvo no cliente. Na próxima OS é só tocar no carro que já preenche tudo.</p>
+    <form id="fcar" class="form"><label class="f meia">Carro / veículo *<input id="cr-v" list="dl-vei2" autocomplete="off" placeholder="Ex.: Gol 1.6, Kwid, Atego"><datalist id="dl-vei2">${veicTodos().map(v=>`<option value="${h(v[0]+" "+v[1])}">`).join("")}</datalist></label>
+    <label class="f">Placa<input id="cr-p" placeholder="ABC1D23" style="text-transform:uppercase"></label><label class="f">Ano<input id="cr-a" inputmode="numeric" maxlength="4"></label>
+    <label class="f meia">Motor<input id="cr-m" placeholder="Ex.: AP 1.6, SCe 1.0"></label><label class="f meia">Nº do motor (no bloco)<input id="cr-n" style="text-transform:uppercase"></label>
+    <div class="acts wide"><button type="button" class="btn" id="cr-x">${depois?"Voltar":"Pular (cadastro depois)"}</button><button class="btn pri" type="submit">💾 Salvar carro</button></div></form>`, m=>{
+    $("#cr-v",m).focus(); $("#cr-x",m).onclick=()=>{ fecharModal(); if (depois) depois(null); };
+    $("#cr-v",m).addEventListener("input", ()=>{ const v=veicAchar($("#cr-v",m).value); if (v && v[3] && v[3].length===1 && !$("#cr-m",m).value) $("#cr-m",m).value=v[3][0]; });
+    $("#fcar",m).onsubmit=async e=>{ e.preventDefault(); const car={veiculo:$("#cr-v",m).value.trim(), placa:$("#cr-p",m).value.trim().toUpperCase(), ano:$("#cr-a",m).value.trim(), motor:$("#cr-m",m).value.trim(), numMotor:$("#cr-n",m).value.trim().toUpperCase(), em:Date.now()};
+      if (!car.veiculo){ toast("Escreva qual é o carro."); return; }
+      try{ await salvarCarro(c, car); fecharModal(); toast("🚗 Carro salvo"); if (depois) depois(car); }catch(err){ erro(err); } };
+  }); }
+async function salvarCarro(c, car){ if (!c || !c.id || !(car.veiculo||car.motor)) return; const L=(c.veiculos||[]).slice(), k=x=>(x.placa?x.placa.replace(/\W/g,""):"")||norm((x.veiculo||"")+"|"+(x.motor||""));
+  const i=L.findIndex(x=>k(x)===k(car)); if (i>=0) L[i]=Object.assign({}, L[i], Object.fromEntries(Object.entries(car).filter(([,v])=>v))); else L.push(car);
+  c.veiculos=L; await db.doc("clientes/"+c.id).update({veiculos:L}); }
 function clienteRepetido(d, exceto){ const tel=digitos(d.telefone), nm=norm(d.nome||"");
   return S.clientes.find(x=>x.id!==exceto && ((tel.length>=8 && digitos(x.telefone).slice(-8)===tel.slice(-8)) || (nm.length>=3 && norm(x.nome)===nm))) || null; }
 async function conferirVersao(path, antes){ try{ const s=await db.doc(path).get(); if (!s.exists) return true; const cur=s.data();
@@ -2471,6 +2541,7 @@ function formBling(o){
   if (!(direcao()||ehLojista())){ toast("Só chefe, gerente ou lojista."); return; }
   if (o.bling){ toast("Esta OS já foi mandada para o Bling."); formNota(o); return; }
   const c=S.clientes.find(x=>x.id===o.clienteId)||S.clientes.find(x=>x.nome===o.cliente)||{};
+  const E = (c.endereco && typeof c.endereco==="object") ? c.endereco : {rua:c.endereco||"", numero:c.numero||"", bairro:c.bairro||"", cep:c.cep||"", cidade:c.cidade||"", uf:c.uf||""};
   const ts=totalServ(o), tp=totalPecas(o), desc=Number(o.desconto)||0, base=ts+tp||1;
   const dS=Math.round(desc*ts/base*100)/100, dP=Math.round((desc-dS)*100)/100;
   const PE=(o.pecas||[]).filter(p=>(Number(p.preco)||0)>0 && (Number(p.qtd)||0)>0).map(p=>{ const e=S.pecas.find(x=>x.id===p.pecaId)||{}; return {p, ncm:e.ncm||"", cod:p.codigo||e.codigo||("RM"+String(p.pecaId||"").slice(0,10))}; });
@@ -2482,12 +2553,12 @@ function formBling(o){
       <label class="f">Nome / Razão social *<input id="bt-n" value="${h(c.nome||o.cliente||"")}" required></label>
       <label class="f">CPF ou CNPJ *<input id="bt-d" value="${h(c.doc||"")}" inputmode="numeric" required></label>
       <label class="f">E-mail (recebe a nota)<input id="bt-e" type="email" value="${h(c.email||"")}"></label>
-      <label class="f">CEP<input id="bt-c" value="${h(c.cep||"")}" inputmode="numeric"></label>
-      <label class="f">Rua *<input id="bt-r" value="${h(c.endereco||"")}" required></label>
-      <label class="f">Número<input id="bt-nu" value="${h(c.numero||"")}"></label>
-      <label class="f">Bairro *<input id="bt-b" value="${h(c.bairro||"")}" required></label>
-      <label class="f">Cidade *<input id="bt-m" value="${h(c.cidade||"Fortaleza")}" required></label>
-      <label class="f">UF<input id="bt-u" value="${h(c.uf||"CE")}" maxlength="2"></label>
+      <label class="f">CEP<input id="bt-c" value="${h(E.cep||"")}" inputmode="numeric"></label>
+      <label class="f">Rua *<input id="bt-r" value="${h(E.rua||"")}" required></label>
+      <label class="f">Número<input id="bt-nu" value="${h(E.numero||"")}"></label>
+      <label class="f">Bairro *<input id="bt-b" value="${h(E.bairro||"")}" required></label>
+      <label class="f">Cidade *<input id="bt-m" value="${h(E.cidade||c.cidade||"Fortaleza")}" required></label>
+      <label class="f">UF<input id="bt-u" value="${h(E.uf||"CE")}" maxlength="2"></label>
       ${SV.length?`<div class="wide card" style="padding:10px 12px;background:var(--surface-2)"><b>NFS-e · serviços (prefeitura)</b><div class="muted" style="font-size:13px">${SV.map(x=>h(sTxt?sTxt(x):x.desc)).join(" · ")}</div><div>Valor: <b>${money(ts)}</b>${dS?` · desconto ${money(dS)} · <b>${money(ts-dS)}</b>`:""}</div></div>`:""}
       ${PE.length?`<div class="wide card" style="padding:10px 12px;background:var(--surface-2)"><b>NF-e · peças (Sefaz)</b><table style="margin-top:6px"><tr><th>Peça</th><th>Código</th><th class="n">Qtd</th><th class="n">Valor</th><th>NCM</th></tr>${PE.map((x,i)=>`<tr><td>${h(x.p.nome)}</td><td class="mono">${h(x.cod)}</td><td class="n">${x.p.qtd}</td><td class="n">${money(x.p.preco)}</td><td><input data-ncm="${i}" value="${h(x.ncm)}" placeholder="8 números" inputmode="numeric" style="width:110px"></td></tr>`).join("")}</table><div>Total: <b>${money(tp)}</b>${dP?` · desconto ${money(dP)} · <b>${money(tp-dP)}</b>`:""}</div><div class="muted" style="font-size:12px">O NCM fica salvo na peça do estoque para as próximas notas. Se a peça estiver cadastrada no Bling com o mesmo código, o Bling usa os dados dela.</div></div>`:""}
       ${!SV.length&&!PE.length?`<div class="wide banner bad" style="margin:0">Esta OS não tem serviços nem peças com valor.</div>`:""}
@@ -2714,7 +2785,7 @@ FILL.fichas = () => { fillSemMedidas();
   const q = norm($("#fc-q")?.value);
   const l = S.fichas.filter(f=>!q || norm(f.motor+" "+(f.apelidos||"")).includes(q)).sort((a,b)=>a.motor.localeCompare(b.motor));
   $("#fc-lista").innerHTML = l.length ? `<table><tr><th>Motor</th><th>Outros nomes</th><th>Linha</th><th class="n">Medidas</th><th class="n">OS ativas</th><th></th></tr>${l.map(f=>`<tr><td><b>${h(f.motor)}</b>${f.fabricante?` <span class="muted">${h(f.fabricante)}</span>`:""}</td>
-    <td class="muted">${h(f.apelidos)}</td><td>${{leve:"Leve",pesada:"Pesada"}[f.linha]||"—"}</td><td class="n">${(f.itens||[]).length}</td><td class="n">${S.os.filter(o=>ATIVAS.includes(o.status)&&fichaDaOS(o)?.id===f.id).length}</td>
+    <td class="muted">${h(f.apelidos)}</td><td>${{leve:"Leve",pesada:"Pesada",scania:"Scania"}[f.linha]||"—"}</td><td class="n">${(f.itens||[]).length}</td><td class="n">${S.os.filter(o=>ATIVAS.includes(o.status)&&fichaDaOS(o)?.id===f.id).length}</td>
     <td class="n" style="white-space:nowrap"><button class="btn sm" data-a="dup" data-id="${f.id}">Duplicar</button> <button class="btn sm" data-a="ed" data-id="${f.id}">Editar</button></td></tr>`).join("")}</table>`
     : `<div class="empty">${S.fichas.length?"Nenhuma ficha encontrada.":"Nenhuma ficha ainda. Cadastre os motores que vocês mais retificam."}</div>`;
   $("#ck-lista").innerHTML = S.setores.length ? `<table><tr><th>Setor</th><th>Tarefas</th><th></th></tr>${S.setores.map(st=>{ const l=S.checklists[st]||[]; return `<tr><td><b>${h(st)}</b></td><td class="muted">${l.length?h(l.join(" · ")):"Nenhuma tarefa"}</td><td class="n"><button class="btn sm" data-ck="${h(st)}">Editar</button></td></tr>`; }).join("")}</table>` : `<div class="empty">Cadastre os setores primeiro.</div>`;
@@ -2740,7 +2811,7 @@ function formFicha(f){
     <label class="f">Motor<input id="fi-m" required value="${h(f.motor)}" placeholder="Ex.: AP 1.6"></label>
     <label class="f">Outros nomes (separe por vírgula)<input id="fi-a" value="${h(f.apelidos)}" placeholder="Ex.: AP1.6, AP 1.6 8v"></label>
     <label class="f">Fabricante<input id="fi-fab" value="${h(f.fabricante)}"></label>
-    <label class="f">Linha<select id="fi-l"><option value="leve" ${f.linha!=="pesada"?"selected":""}>Leve</option><option value="pesada" ${f.linha==="pesada"?"selected":""}>Pesada</option></select></label>
+    <label class="f">Linha<select id="fi-l">${LINHAS.map(([k,t])=>`<option value="${k}" ${(f.linha||"leve")===k?"selected":""}>${t}</option>`).join("")}</select></label>
     <label class="f wide">Observação<input id="fi-o" value="${h(f.obs)}" placeholder="Ex.: conferido no manual MWM, rev. 2024"></label>
     <div class="wide"><b>Medidas</b> <span class="muted" style="font-size:13px">Mín. e Máx. (só números, na mesma unidade) fazem o sistema avisar quando o mecânico anotar uma medida fora do limite.</span><div id="fi-itens" class="grid" style="gap:6px;margin-top:6px"></div><button type="button" class="btn sm" id="fi-add" style="margin-top:8px">+ Adicionar medida</button></div>
     <div class="acts wide">${!novo&&ehChefe()?`<button type="button" class="btn danger" id="fi-del">Excluir ficha</button><span class="spacer"></span>`:""}<button type="button" class="btn" id="fi-c">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{
@@ -3481,12 +3552,15 @@ async function carregarServicosPadrao(){
     try{ for (const [desc,linha] of novos) await db.collection("precos").add({desc, linha, valor:null, criadoEm:Date.now(), atualizadoEm:Date.now(), porNome:me.nome});
       auditar("Tabela de preços", `Lista padrão (${novos.length} serviços)`, null, {lista:novos.map(x=>x[0])}); toast(`✅ ${novos.length} serviços colocados. Agora coloque os preços.`); }catch(err){ erro(err); } });
 }
+/* LINHAS: leve (carro), pesada (caminhão, ônibus, máquina) e Scania (motores Scania têm peças e preços próprios) */
+const LINHAS = [["leve","Leve"],["pesada","Pesada"],["scania","Scania"]];
+const nomeLinha = l => (LINHAS.find(x=>x[0]===l)||["","Leve"])[1];
 function precosDaLinha(linha){ return (S.precos||[]).filter(p=>!p.linha||p.linha==="ambas"||p.linha===linha).sort((a,b)=>a.desc.localeCompare(b.desc)); }
 function formPreco(p){
   const novo=!p; p=p||{linha:"ambas"};
   abrirModal(`<h2>${novo?"Novo serviço na tabela":"Editar serviço"}</h2><form id="fpr" class="form">
     <label class="f wide">Serviço<input id="pr-d" required value="${h(p.desc)}" placeholder="Ex.: Retífica de cabeçote AP 1.6"></label>
-    <label class="f">Linha<select id="pr-l">${[["ambas","Leve e pesada"],["leve","Leve"],["pesada","Pesada"]].map(([k,t])=>`<option value="${k}" ${p.linha===k?"selected":""}>${t}</option>`).join("")}</select></label>
+    <label class="f">Linha<select id="pr-l">${[["ambas","Todas as linhas"],...LINHAS].map(([k,t])=>`<option value="${k}" ${p.linha===k?"selected":""}>${t}</option>`).join("")}</select></label>
     <label class="f">Valor R$<input id="pr-v" inputmode="decimal" required value="${p.valor!=null?String(p.valor).replace(".",","):""}" placeholder="Ex.: 450,00"></label>
     <label class="f wide">Setor que faz este serviço<select id="pr-s"><option value="">— descobrir pelo nome (${h(setorDoServico(p.desc||"")||"nenhum")}) —</option>${(S.setores||[]).map(x=>`<option ${p.setor===x?"selected":""}>${h(x)}</option>`).join("")}</select></label>
     <div class="acts wide">${novo?"":`<button type="button" class="btn danger" id="pr-del">Excluir</button><span class="spacer"></span>`}<button type="button" class="btn" id="pr-x">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{
@@ -3500,7 +3574,7 @@ function formPreco(p){
       try{ if (novo){ d.criadoEm=Date.now(); await db.collection("precos").add(d); auditar("Tabela de preços", d.desc, null, d); } else { if (!(await conferirVersao("precos/"+p.id, p))) return; d.atualizadoPorNome=me.nome; await db.doc("precos/"+p.id).set(d); auditar("Tabela de preços", d.desc, p, d); } fecharModal(); toast("Tabela salva"); }catch(err){ erro(err); } };
   });
 }
-SHELL.precos = () => `<div class="top"><h1>Tabela de preços</h1>${ehChefe()?`<button class="btn" id="pr-pad">📋 Colocar serviços comuns</button><button class="btn pri" id="pr-novo">Novo serviço</button>`:""}</div>
+SHELL.precos = () => `<div class="top"><h1>Tabela de preços</h1>${ehChefe()?`<button class="btn pri" id="pr-novo">Novo serviço</button>`:""}</div>
   <div class="banner" style="margin:0 0 12px">${ehChefe()?"Só você (chefe) muda os preços. Na OS, o gerente e o lojista só escolhem o serviço e a quantidade.":"Só o chefe muda os preços desta tabela."}</div>
   <div class="card" style="margin-bottom:12px"><div class="row"><b>🛡 Garantia padrão dos serviços:</b> <span id="pr-gar"></span><span class="spacer"></span>${ehChefe()?`<button class="btn sm" id="pr-gm">Mudar</button>`:""}</div>
     <div class="row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><b>🏷️ Nome nas mensagens:</b> <span id="pr-emp"></span><span class="muted" style="font-size:12px">· nome e logo são fixos do sistema</span></div>
@@ -3508,7 +3582,7 @@ SHELL.precos = () => `<div class="top"><h1>Tabela de preços</h1>${ehChefe()?`<b
   <div class="card"><input id="pr-q" type="search" placeholder="Buscar serviço" value="${h(UI.prBusca||"")}" style="width:min(320px,100%);margin-bottom:10px"><div class="tbl-wrap" id="pr-lista"></div></div>`;
 BIND.precos = () => {
   if (!ehChefe()){ $("#pr-q").oninput=e=>{ UI.prBusca=e.target.value; FILL.precos(); }; return; }
-  $("#pr-novo").onclick=()=>formPreco(); $("#pr-pad").onclick=carregarServicosPadrao;
+  $("#pr-novo").onclick=()=>formPreco();
   /* nome e logo fixos: sem edição pelo site */
   const hr=$("#pr-hr"); if (hr) hr.onclick=()=>abrirModal(`<h2>🕗 Horário de atendimento</h2><p class="muted" style="margin:0">Vai na mensagem de "motor pronto", para o cliente saber quando pode vir buscar.</p>
     <label class="f">Horário<textarea id="hr-t" rows="3" placeholder="${h(HORARIO_PADRAO)}">${h((S.filaCfg&&S.filaCfg.horario)||HORARIO_PADRAO)}</textarea></label>
@@ -3525,8 +3599,8 @@ FILL.precos = () => {
   $("#pr-gar").textContent = garantiaDias() ? `${garantiaDias()} dias` : "sem garantia";
   const q=norm(UI.prBusca||""); const l=(S.precos||[]).filter(p=>!q||norm(p.desc).includes(q)).sort((a,b)=>((a.valor==null)-(b.valor==null))*-1||a.desc.localeCompare(b.desc));
   const uso={}, lim=Date.now()-30*864e5; S.os.forEach(o=>{ if (o.status==="cancelada") return; (o.servicos||[]).forEach(x=>{ const k=norm(x.desc), u=uso[k]=uso[k]||{t:0,m:0}; u.t+=sQtd(x); if ((o.criadoEm||0)>=lim) u.m+=sQtd(x); }); });
-  $("#pr-lista").innerHTML = l.length ? `<table><tr><th>Serviço</th><th>Setor</th><th>Linha</th><th class="n">Vezes usado</th><th class="n">Valor</th><th>Atualizado</th><th></th></tr>${l.map(p=>{ const u=uso[norm(p.desc)]||{t:0,m:0}; return `<tr><td><b>${h(p.desc)}</b></td><td style="font-size:13px">${h(p.setor||setorDoServico(p.desc)||"—")}</td><td>${{ambas:"Leve e pesada",leve:"Leve",pesada:"Pesada"}[p.linha]||"—"}</td><td class="n"><b>${u.t}</b><br><span class="muted" style="font-size:12px">${u.m} nos últimos 30 dias</span></td><td class="n">${p.valor==null?`<span class="chip-low">sem preço</span>`:money(p.valor)}</td><td class="muted">${dt(p.atualizadoEm)}${p.porNome?` · ${h(p.porNome)}`:""}</td><td class="n">${ehChefe()?`<button class="btn sm" data-pr="${p.id}">Editar</button>`:""}</td></tr>`; }).join("")}</table>`
-    : `<div class="empty">${(S.precos||[]).length?"Nenhum serviço encontrado.":"Nenhum serviço na tabela ainda. Aperte <b>📋 Colocar serviços comuns</b> para começar com uma lista pronta."}</div>`;
+  $("#pr-lista").innerHTML = l.length ? `<table><tr><th>Serviço</th><th>Setor</th><th>Linha</th><th class="n">Vezes usado</th><th class="n">Valor</th><th>Atualizado</th><th></th></tr>${l.map(p=>{ const u=uso[norm(p.desc)]||{t:0,m:0}; return `<tr><td><b>${h(p.desc)}</b></td><td style="font-size:13px">${h(p.setor||setorDoServico(p.desc)||"—")}</td><td>${{ambas:"Todas as linhas",leve:"Leve",pesada:"Pesada",scania:"Scania"}[p.linha]||"—"}</td><td class="n"><b>${u.t}</b><br><span class="muted" style="font-size:12px">${u.m} nos últimos 30 dias</span></td><td class="n">${p.valor==null?`<span class="chip-low">sem preço</span>`:money(p.valor)}</td><td class="muted">${dt(p.atualizadoEm)}${p.porNome?` · ${h(p.porNome)}`:""}</td><td class="n">${ehChefe()?`<button class="btn sm" data-pr="${p.id}">Editar</button>`:""}</td></tr>`; }).join("")}</table>`
+    : `<div class="empty">${(S.precos||[]).length?"Nenhum serviço encontrado.":"Nenhum serviço na tabela ainda. Toque em Novo serviço para cadastrar o primeiro."}</div>`;
 };
 
 /* ---- contas a receber ---- */
@@ -3605,7 +3679,7 @@ FILL.compras = () => {
 };
 
 /* ---- central do gerente ---- */
-SHELL.agora = () => `<div class="top"><h1>Tarefas</h1><button class="btn pri" id="ag-nova">Nova OS</button></div><div id="ag-res"></div><div id="ag-av" style="max-width:820px"></div>${direcao()?`<details class="card" id="ag-ofw" style="margin-bottom:10px;max-width:820px" ${UI.agOf===false?"":"open"}><summary><b>👷 Oficina agora · quem está com o quê</b></summary><button type="button" class="btn sm" id="ag-impf" style="margin:6px 0">🖨 Imprimir a fila de todos os setores</button><div id="ag-of"></div></details>`:""}<div class="grid" id="ag-l" style="gap:8px;max-width:820px"></div>
+SHELL.agora = () => `<div class="top"><h1>Tarefas</h1><button class="btn pri" id="ag-nova">Nova OS</button></div><div id="ag-res"></div><div id="ag-av" style="max-width:820px"></div>${direcao()&&OFICINA?`<details class="card" id="ag-ofw" style="margin-bottom:10px;max-width:820px" ${UI.agOf===false?"":"open"}><summary><b>👷 Oficina agora · quem está com o quê</b></summary><button type="button" class="btn sm" id="ag-impf" style="margin:6px 0">🖨 Imprimir a fila de todos os setores</button><div id="ag-of"></div></details>`:""}<div class="grid" id="ag-l" style="gap:8px;max-width:820px"></div>
   <details class="card dcol" style="margin-top:14px;max-width:820px"><summary><h2>📅 Entregas da semana</h2></summary><div id="ag-sem" style="margin-top:8px"></div></details>`;
 BIND.agora = () => {
   $("#ag-nova").onclick=()=>formOS();
@@ -3633,7 +3707,7 @@ function htmlPedidosOficina(ped){
 async function pedidoSeparar(id){ const c=S.compras.find(x=>x.id===id); if (!c) return; const p=peca(c.pecaId), o=S.os.find(x=>x.id===c.osId); if (!p||!o){ toast("Não achei a peça ou a OS."); return; }
   try{ await lancarPeca(o.id, p, c.qtd||1); await db.doc("compras/"+c.id).update({status:"chegou", chegouEm:Date.now(), chegouPorNome:me.nome, obs:[c.obs,"separado do estoque"].filter(Boolean).join(" · ")}); toast(`✅ ${c.qtd||1}× ${p.nome} lançada na OS ${codOS(o)}`); }catch(err){ erro(err); } }
 async function pedidoComprado(id){ try{ await db.doc("compras/"+id).update({status:"pedido", pedidoEm:Date.now(), pedidoPorNome:me.nome}); toast("Marcado como pedido ao fornecedor"); }catch(err){ erro(err); } }
-function pendenciasGerente(){ return pendenciasGerente0().map(p=>Object.assign({l:[]}, p, {l:p.l||[]})); }
+function pendenciasGerente(){ return pendenciasGerente0().filter(p=>OFICINA||!SO_OFICINA.includes(p.k)).map(p=>Object.assign({l:[]}, p, {l:p.l||[]})); }
 function pendenciasGerente0(){
   const ativas = S.os.filter(o=>["aberta","execucao","aguardando","pronta"].includes(o.status));
   const al = []; S.os.forEach(o=>alertasAbertos(o).forEach(a=>al.push({o,a})));
@@ -3866,10 +3940,10 @@ function formPagarConta(c, mes){ const venc=vencDaConta(c, mes);
   abrirModal(`<h2>💸 Pagar · ${h(c.desc)}</h2><p class="muted" style="margin:0 0 8px">Vencimento ${dia(venc)}</p><form id="pcf" class="form">
     <label class="f">Valor pago R$<input id="pc-v" inputmode="decimal" required value="${String(c.valor||"").replace(".",",")}"></label>
     <label class="f">Pago em<input id="pc-d" type="date" value="${hojeISO()}"></label>
-    <label class="f">Forma<select id="pc-f">${["Pix","Boleto","Dinheiro","Transferência","Cartão","Débito automático"].map(x=>`<option>${x}</option>`).join("")}</select></label>
+    <label class="f">Forma<select id="pc-f">${FORMAS_SAIDA.map(x=>`<option>${x}</option>`).join("")}</select></label>
     <div class="acts wide"><button type="button" class="btn" id="pc-x">Cancelar</button><button class="btn pri" type="submit">Confirmar pagamento</button></div></form>`, m=>{ $("#pc-x",m).onclick=fecharModal;
     $("#pcf",m).onsubmit=async e=>{ e.preventDefault(); const v=num($("#pc-v",m).value), d0=$("#pc-d",m).value, fo=$("#pc-f",m).value; if (!(v>0)){ toast("Coloque o valor."); return; }
-      try{ await db.collection("despesas").add({dia:d0, categoria:c.categoria||"Outros", desc:`${c.desc}${c.recorrente==="mensal"?` (${mes.slice(5)}/${mes.slice(0,4)})`:""}${c.fornecedor?" · "+c.fornecedor:""} · ${fo}`, valor:v, porNome:me.nome, criadoEm:Date.now(), atualizadoEm:Date.now(), contaId:c.id});
+      try{ await db.collection("despesas").add({dia:d0, categoria:c.categoria||"Outros", desc:`${c.desc}${c.recorrente==="mensal"?` (${mes.slice(5)}/${mes.slice(0,4)})`:""}${c.fornecedor?" · "+c.fornecedor:""}`, forma:fo, valor:v, porNome:me.nome, criadoEm:Date.now(), atualizadoEm:Date.now(), contaId:c.id});
         if (c.recorrente==="mensal") await db.doc("contasPagar/"+c.id).update({pagos:Object.assign({}, c.pagos||{}, {[mes]:{em:Date.now(), valor:v, porNome:me.nome}})}); else await db.doc("contasPagar/"+c.id).update({pagoEm:Date.now(), pagoValor:v, pagoPorNome:me.nome});
         auditar("Contas a pagar", c.desc, {pago:"-"}, {pago:`${money(v)} em ${dia(d0)} (${fo})`}); fecharModal(); toast("✅ Pagamento registrado e lançado nas despesas"); }catch(err){ erro(err); } };
   }); }
@@ -3970,22 +4044,24 @@ function fichaBusca(o){ const linha=(ic,t,v)=>v?`<div class="row" style="gap:8px
 /* =================== PAINEL DO CHEFE =================== */
 SHELL.chefe = () => `<div class="top"><h1>📊 Painel</h1><span class="muted" id="pc-hora"></span></div>
   <div class="card" id="pc-alc"><h2>🚨 Precisa de você</h2><div id="pc-al" style="margin-top:6px"></div></div>
-  <div class="card" style="margin-top:12px"><div class="row"><h2 style="flex:1">👷 Oficina agora · quem está com o quê</h2><button type="button" class="btn sm" id="pc-impf">🖨 Imprimir filas</button></div><div id="pc-of"></div></div>
+  ${!OFICINA?`<div class="card" style="margin-top:12px"><h2>📋 OS agora</h2><div class="tiles" id="pc-os" style="margin-top:8px"></div><p class="muted" style="font-size:13px;margin:8px 0 0">Toque num quadro para ver a lista.</p></div>
+  <div class="card" style="margin-top:12px"><h2>📦 Estoque</h2><div class="tiles" id="pc-est" style="margin-top:8px"></div></div>`:`<div class="card" style="margin-top:12px"><div class="row"><h2 style="flex:1">👷 Oficina agora · quem está com o quê</h2><button type="button" class="btn sm" id="pc-impf">🖨 Imprimir filas</button></div><div id="pc-of"></div></div>`}
   <div class="card" style="margin-top:12px"><h2>💰 Dinheiro</h2><div class="tiles" id="pc-din" style="margin-top:8px"></div>
     <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Ver mais números do mês</summary><div class="tiles" id="pc-mes" style="margin-top:8px"></div></details></div>
-  <div class="card" style="margin-top:12px"><h2>🔧 Oficina</h2><div id="pc-gar"></div><div class="tiles" id="pc-prod" style="margin-top:8px"></div>
+  ${OFICINA?`<div class="card" style="margin-top:12px"><h2>🔧 Oficina</h2><div id="pc-gar"></div><div class="tiles" id="pc-prod" style="margin-top:8px"></div>
     <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Ver peças por setor e o que cada mecânico terminou</summary>
     <h3 style="margin:12px 0 6px;font-size:15px">Peças em cada setor agora</h3><div id="pc-set"></div>
-    <h3 style="margin:16px 0 6px;font-size:15px">O que cada mecânico terminou</h3><div id="pc-mec"></div></details></div>`;
+    <h3 style="margin:16px 0 6px;font-size:15px">O que cada mecânico terminou</h3><div id="pc-mec"></div></details></div>`:""}`;
 BIND.chefe = () => {
   $("#pc-al").onclick = e => { const b=e.target.closest("[data-pcgo]"); if(!b) return; const k=b.dataset.pck; (UI.agAberto||(UI.agAberto=new Set())).add(k); location.hash="#"+(b.dataset.pcgo||"agora"); };
-  $("#pc-set").onclick = e => { const b=e.target.closest("[data-pcset]"); if(!b) return; UI.osBusca=""; location.hash="#os"; };
+  if ($("#pc-os")) $("#pc-os").onclick = e => { const b=e.target.closest("[data-pcf]"); if(!b) return; const f=b.dataset.pcf; UI.osFiltro = f==="atras"?"ativas":f==="aberta"?"naoficina":f; UI.osBusca=""; UI.osEscopo = f==="atras"?"atras":""; location.hash="#os"; };
+  if ($("#pc-set")) $("#pc-set").onclick = e => { const b=e.target.closest("[data-pcset]"); if(!b) return; UI.osBusca=""; location.hash="#os"; };
 };
 function terminouInfo(e){ const t=e.txt||""; if (!/ terminou /.test(t) || /^Ficou sem fazer/.test(t)) return null;
   const m = t.match(/ em ([^.]+)\./) || t.match(/no setor ([^.]+)/) || t.match(/ terminou ([^.]+)\./); let st=m?m[1].trim():""; if (/^a parte dele/.test(st)) st=""; return {setor:st||e.setor||"", pecas:1}; }
 FILL.chefe = () => {
   const agora=new Date(), hoje=new Date(); hoje.setHours(0,0,0,0); const h0=hoje.getTime(), mesI=new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime(), mesS=hojeISO().slice(0,7);
-  $("#pc-of").innerHTML = htmlOficinaAgora(); ligarOficinaAgora($("#pc-of")); $("#pc-impf").onclick=()=>imprimirFila(null, S.setores.filter(st=>filaDoSetor(st).length));
+  if (OFICINA){ $("#pc-of").innerHTML = htmlOficinaAgora(); ligarOficinaAgora($("#pc-of")); $("#pc-impf").onclick=()=>imprimirFila(null, S.setores.filter(st=>filaDoSetor(st).length)); }
   $("#pc-hora").textContent = "Atualizado " + agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
   const tile=(c,v,l,sub)=>`<div class="tile ${c}"><div class="v num">${v}</div><div class="l">${l}${sub?`<br><span style="font-size:12px;opacity:.8">${sub}</span>`:""}</div></div>`;
   // dinheiro
@@ -3997,6 +4073,13 @@ FILL.chefe = () => {
   const comp = S.movimentos.filter(x=>x.tipo==="entrada" && isoDia(x.em).startsWith(mesS)).reduce((t,x)=>t+(Number(x.totalCompra)||(Number(x.custoUnit)||0)*(x.delta||0)),0);
   const dev = devendo(), aRec = dev.reduce((t,o)=>t+faltaPagar(o),0), venc = dev.filter(vencida), vVal = venc.reduce((t,o)=>t+faltaPagar(o),0);
   const res = rMes-desp-comp;
+  if (!OFICINA){ const ini=mesS+"-01", fim=mesS+"-31", sai=saidasEntre(ini,fim).reduce((t,x)=>t+x.valor,0), saiH=saidasEntre(hojeISO(),hojeISO()).reduce((t,x)=>t+x.valor,0), ent=entradasEntre(ini,fim);
+    const tl=(c,v,l,sub,go)=>`<a href="#${go}" class="tile ${c}" style="text-decoration:none;color:inherit"><div class="v num">${v}</div><div class="l">${l}${sub?`<br><span style="font-size:12px;opacity:.8">${sub}</span>`:""}</div></a>`;
+    $("#pc-din").innerHTML = tl("ok", money(rHoje), "⬇️ Entrou hoje", "", "caixa") + tl("ok", money(ent), "⬇️ Entrou no mês", "", "caixa") + tl("bad", money(sai), "⬆️ Saiu no mês", saiH?`hoje ${money(saiH)}`:"", "saidas") + tl(ent-sai>=0?"accent":"bad", money(ent-sai), "Sobrou no mês", venc.length?`⚠️ ${venc.length} OS com pagamento vencido (${money(vVal)})`:"", "saidas");
+    const P=S.pecas||[], baixo=P.filter(p=>(p.qtd||0)<=(p.minimo||0)), valor=P.reduce((t,p)=>t+(Number(p.custo)||0)*Math.max(0,Number(p.qtd)||0),0), pedir=(S.compras||[]).filter(c=>c.status==="pedir").length;
+    const compMes=S.movimentos.filter(x=>x.tipo==="entrada" && isoDia(x.em).startsWith(mesS)).reduce((t,x)=>t+(Number(x.totalCompra)||0),0);
+    $("#pc-est").innerHTML = tl(baixo.length?"bad":"ok", baixo.length, "Peças no mínimo ou acabando", baixo.slice(0,3).map(p=>p.nome).join(", ")+(baixo.length>3?"…":""), "estoque") + tl("info", money(valor), "Valor parado no estoque", `${P.length} peças cadastradas`, "estoque") + tl(pedir?"warn":"ok", pedir, "Na lista de compras", "falta pedir", "compras") + tl("accent", money(compMes), "Comprado no mês", "peças para o estoque", "saidas");
+  } else
   $("#pc-din").innerHTML = tile("ok", money(rHoje), "Recebido hoje") + tile("ok", money(rMes), "Recebido no mês") + tile(res>=0?"ok":"bad", money(res), "Resultado do mês") + tile(venc.length?"bad":"ok", money(vVal), "Vencido", `${venc.length} OS`);
   $("#pc-mes").innerHTML = tile("info", money(recLoja(h0)), "Vendas da loja hoje") + tile("accent", nEnt, "Motores entregues hoje") + tile("warn", money(desp+comp), "Despesas + compras", `despesas ${money(desp)} · peças ${money(comp)}`) + tile("info", money(aRec), "A receber", `${dev.length} OS`);
   // alertas
@@ -4007,6 +4090,10 @@ FILL.chefe = () => {
   if ($("#pc-mais")) $("#pc-mais").onclick=()=>{ UI.pcTodos=!UI.pcTodos; FILL.chefe(); };
   // produção
   const emAnd = S.os.filter(o=>["aberta","execucao","aguardando"].includes(o.status));
+  if (!OFICINA){ const cnt=st=>S.os.filter(o=>o.status===st).length, at=S.os.filter(atrasoOS).length;
+    const t2=(c,v,l,f)=>`<button type="button" class="tile ${c}" data-pcf="${f}" style="text-align:left;cursor:pointer;font:inherit;color:inherit">${`<div class="v num">${v}</div><div class="l">${l}</div>`}</button>`;
+    $("#pc-os").innerHTML = t2("info", cnt("orcamento"), "📝 Orçamentos esperando o cliente", "orcamento") + t2("accent", emAnd.length, "🔧 Na oficina", "aberta") + t2(at?"bad":"ok", at, "🔴 Atrasadas", "atras") + t2("ok", cnt("pronta"), "🏁 Prontas para entregar", "pronta");
+    return; }
   const par = (pendenciasGerente().find(p=>p.k==="parada")||{l:[]}).l.length;
   $("#pc-prod").innerHTML = tile("accent", emAnd.length, "Motores na oficina") + tile("ok", S.os.filter(o=>o.status==="pronta").length, "Prontos para entregar") + tile(par?"warn":"ok", par, "Peças paradas +2 dias");
   const porSet = S.setores.map(x=>[x, emAnd.filter(o=>setoresAtuais(o).includes(x)).length]);
@@ -4429,14 +4516,21 @@ function padAssinatura(box){
 }
 /* parte da aprovação que pede assinatura (quando é "Pessoalmente") ou o registro de como foi (a distância) */
 function htmlBlocoAssinatura(){ return `<div id="as-wrap" style="margin-top:8px"><div class="banner" style="margin:0 0 6px;font-size:13px;line-height:1.4" id="as-termo"></div>
-  <div id="as-pad"></div><div class="form" style="margin-top:6px"><label class="f">Nome de quem assina<input id="as-n"></label><label class="f">CPF de quem assina (opcional)<input id="as-d" inputmode="numeric"></label></div></div>
+  <div id="as-pad"></div><div class="form" style="margin-top:6px"><label class="f">Nome de quem assina<input id="as-n"></label><label class="f">CPF (ou CNPJ) de quem assina <b style="color:var(--bad)">*</b><input id="as-d" inputmode="numeric" placeholder="000.000.000-00"></label></div></div>
   <div id="as-dist" hidden class="banner warn" style="margin:8px 0 0">📵 Aprovação <b>a distância</b>: fica registrado como foi, e a OS fica marcada <b>"sem assinatura"</b> até o cliente assinar (na entrega, por exemplo). Escreva na observação como ele aprovou (ex.: "áudio no WhatsApp às 10h"). Depois, na OS, toque em <b>📲 Mandar para assinar no WhatsApp</b>: ele assina pelo celular dele.</div>`; }
-function ligarBlocoAssinatura(m, getComo, termo, nomePadrao){
-  const pad=padAssinatura($("#as-pad",m)); $("#as-termo",m).textContent=termo; $("#as-n",m).value=nomePadrao||"";
+/* CPF/CNPJ: confere os dígitos verificadores */
+function docValido(v){ const d=String(v||"").replace(/\D/g,"");
+  if (d.length===11){ if (/^(\d)\1+$/.test(d)) return false; const dv=k=>{ let t=0; for (let i=0;i<k;i++) t+=(+d[i])*(k+1-i); const r=(t*10)%11; return r===10?0:r; }; return dv(9)===+d[9] && dv(10)===+d[10]; }
+  if (d.length===14){ if (/^(\d)\1+$/.test(d)) return false; const dv=k=>{ const w=k===12?[5,4,3,2,9,8,7,6,5,4,3,2]:[6,5,4,3,2,9,8,7,6,5,4,3,2]; let t=0; for (let i=0;i<k;i++) t+=(+d[i])*w[i]; const r=t%11; return r<2?0:11-r; }; return dv(12)===+d[12] && dv(13)===+d[13]; }
+  return false; }
+function fmtDoc(v){ const d=String(v||"").replace(/\D/g,""); return d.length===11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4") : d.length===14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5") : String(v||"").trim(); }
+function ligarBlocoAssinatura(m, getComo, termo, nomePadrao, docPadrao){
+  const pad=padAssinatura($("#as-pad",m)); $("#as-termo",m).textContent=termo; $("#as-n",m).value=nomePadrao||""; $("#as-d",m).value=docPadrao?fmtDoc(docPadrao):"";
   const atual=()=>{ const pes=getComo()==="Pessoalmente"; $("#as-wrap",m).hidden=!pes; $("#as-dist",m).hidden=pes; }; atual();
   return { atual, ler:()=>{ if (getComo()!=="Pessoalmente") return {ok:true, ass:null};
     if (pad.vazio()){ toast("Falta a assinatura do cliente."); return {ok:false}; } const nome=$("#as-n",m).value.trim(); if (!nome){ toast("Escreva o nome de quem assinou."); return {ok:false}; }
-    return {ok:true, ass:{img:pad.png(), nome, doc:$("#as-d",m).value.trim(), termo, em:Date.now(), colhidaPor:me.id, colhidaPorNome:me.nome, aparelho:(navigator.userAgent||"").slice(0,120)}}; } };
+    const doc=$("#as-d",m).value.trim(); if (!docValido(doc)){ toast(doc?"CPF/CNPJ inválido. Confira os números.":"O CPF de quem assina é obrigatório."); $("#as-d",m).focus(); return {ok:false}; }
+    return {ok:true, ass:{img:pad.png(), nome, doc:fmtDoc(doc), termo, em:Date.now(), colhidaPor:me.id, colhidaPorNome:me.nome, aparelho:(navigator.userAgent||"").slice(0,120)}}; } };
 }
 const assinaturaOS = o => { const A=(o.aprovacoes||[]).filter(a=>a.assinatura).map(a=>a.assinatura).concat([o.assinaturaAvulsa, o.assinaturaRemota, o.aprovacaoRemota].filter(x=>x&&x.img)); return A.length ? A.sort((x,y)=>(x.em||0)-(y.em||0))[A.length-1] : null; };
 /* ASSINATURA PELO WHATSAPP: o sistema cria um link de uso único (vale 7 dias). O cliente abre no celular dele, lê o termo e assina com o dedo.
@@ -4487,7 +4581,7 @@ function formAssinarDepois(o){
   const v=valorAprovado(o)!=null?valorAprovado(o):totalOS(o), termo=termoAprovacao(o, v, o.previsao);
   abrirModal(`<h2>✍️ Assinatura do cliente · OS ${codOS(o)}</h2><p class="muted" style="margin:0">Passe o aparelho para o cliente ler e assinar.</p>${htmlBlocoAssinatura()}
     <div class="acts"><button class="btn" id="aa-x">Cancelar</button><button class="btn pri" id="aa-ok">Salvar assinatura</button></div>`, m=>{
-    const B=ligarBlocoAssinatura(m, ()=>"Pessoalmente", termo, o.cliente);
+    const B=ligarBlocoAssinatura(m, ()=>"Pessoalmente", termo, o.cliente, (cliDaOS(o)||{}).doc);
     $("#aa-x",m).onclick=fecharModal;
     $("#aa-ok",m).onclick=async()=>{ const r=B.ler(); if (!r.ok) return; const b=$("#aa-ok",m); b.disabled=true;
       try{ await patchOS(o.id, d=>{ const A=d.aprovacoes||[]; if (A.length && !A[A.length-1].assinatura) A[A.length-1].assinatura=r.ass; else d.assinaturaAvulsa=r.ass; d.aprovacoes=A; addHist(d, `✍️ Cliente assinou a OS (${r.ass.nome}) · colhida por ${me.nome}`); });
@@ -4506,7 +4600,7 @@ function formAprovacao(o, depois){
     ${htmlBlocoAssinatura()}
     <div class="acts"><button class="btn" id="ap-x">Cancelar</button><button class="btn pri" id="ap-ok">${depois==="aberta"&&o.status==="orcamento"?"✅ Lançar OS":"Registrar aprovação"}</button></div>`, m=>{
     const AR=(o.aprovacaoRemota && !o.aprovacaoRemota.lancada && Math.abs((Number(o.aprovacaoRemota.valor)||0)-totalOS(o))<0.01) ? o.aprovacaoRemota : null;
-    let como=AR?"WhatsApp":COMO_APROV[0]; const AS=ligarBlocoAssinatura(m, ()=>como, termoAprovacao(o, totalOS(o), o.previsao), o.cliente);
+    let como=AR?"WhatsApp":COMO_APROV[0]; const AS=ligarBlocoAssinatura(m, ()=>como, termoAprovacao(o, totalOS(o), o.previsao), o.cliente, (cliDaOS(o)||{}).doc);
     if (AR){ m.querySelectorAll("#ap-c [data-c]").forEach(x=>x.classList.toggle("on",x.dataset.c==="WhatsApp")); AS.atual(); $("#ap-q",m).value=AR.nome; $("#ap-o",m).value=`Aprovou e assinou pelo link do WhatsApp em ${dt(AR.em)}`; $("#as-dist",m).innerHTML=`✅ O cliente <b>já assinou pelo link</b> (${h(AR.nome)}, ${dt(AR.em)}). A assinatura entra junto nesta aprovação.`; }
     $("#ap-c",m).onclick=e=>{ const b=e.target.closest("[data-c]"); if(!b) return; como=b.dataset.c; m.querySelectorAll("[data-c]").forEach(x=>x.classList.toggle("on",x===b)); AS.atual(); };
     $("#ap-x",m).onclick=fecharModal;
@@ -4533,6 +4627,7 @@ function htmlAprovacao(o){
 }
 
 /* ---- despesas (só chefe) ---- */
+const FORMAS_SAIDA = ["Pix","Dinheiro","Cartão de crédito","Cartão de débito","Boleto","Transferência","Débito automático"];
 const CAT_DESP = ["Salários","Aluguel","Luz","Água","Internet e telefone","Impostos","Material de consumo","Ferramentas e máquinas","Manutenção","Combustível e frete","Contador","Outros"];
 function formDespesa(x){
   const novo=!x; x=x||{dia:hojeISO(), categoria:"Outros"};
@@ -4540,15 +4635,48 @@ function formDespesa(x){
     <label class="f">Data<input id="dx-d" type="date" value="${h(x.dia)}" required></label>
     <label class="f">Tipo<select id="dx-c">${CAT_DESP.map(c=>`<option ${x.categoria===c?"selected":""}>${c}</option>`).join("")}</select></label>
     <label class="f wide">Descrição<input id="dx-t" value="${h(x.desc||"")}" placeholder="Ex.: conta de luz outubro" required></label>
+    <label class="f">Pago com<select id="dx-f">${FORMAS_SAIDA.map(f=>`<option ${(x.forma||"Pix")===f?"selected":""}>${f}</option>`).join("")}</select></label>
     <label class="f">Valor R$<input id="dx-v" inputmode="decimal" value="${x.valor!=null?String(x.valor).replace(".",","):""}" required></label>
     <div class="acts wide">${novo?"":`<button type="button" class="btn danger" id="de-del">Apagar</button><span class="spacer"></span>`}<button type="button" class="btn" id="de-x">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{
     $("#de-x",m).onclick=fecharModal;
     const del=$("#de-del",m); if (del) del.onclick=()=>confirmar("Apagar esta despesa?", async()=>{ try{ await apagarComLixeira("despesas/"+x.id, x); auditar("Despesas", x.desc, x, null); toast("Apagada"); }catch(err){ erro(err); } });
-    $("#fde",m).onsubmit=async e=>{ e.preventDefault(); const d={dia:$("#dx-d",m).value, categoria:$("#dx-c",m).value, desc:$("#dx-t",m).value.trim(), valor:num($("#dx-v",m).value), porNome:me.nome, atualizadoEm:Date.now()};
+    $("#fde",m).onsubmit=async e=>{ e.preventDefault(); const d={dia:$("#dx-d",m).value, categoria:$("#dx-c",m).value, desc:$("#dx-t",m).value.trim(), forma:$("#dx-f",m).value, valor:num($("#dx-v",m).value), porNome:me.nome, atualizadoEm:Date.now()};
       if (!(d.valor>0)){ toast("Digite o valor."); return; }
       try{ if (novo){ d.criadoEm=Date.now(); await db.collection("despesas").add(d); } else { await db.doc("despesas/"+x.id).set(d); auditar("Despesas", d.desc, x, d); } fecharModal(); toast("Despesa salva"); }catch(err){ erro(err); } };
   });
 }
+/* ===== TUDO QUE SAIU: despesas + contas pagas + compras de peças, num lugar só ===== */
+function formaDe(x){ if (x.forma) return x.forma; const m=String(x.desc||"").match(/ · (Pix|Boleto|Dinheiro|Transferência|Cartão|Débito automático)$/); return m?(m[1]==="Cartão"?"Cartão de crédito":m[1]):"Não informado"; }
+function saidasEntre(ini, fim){ const L=[];
+  (S.despesas||[]).filter(x=>(x.dia||"")>=ini && (x.dia||"")<=fim).forEach(x=>L.push({dia:x.dia, o:x.desc||"", tipo:x.categoria||"Outros", forma:formaDe(x), valor:Number(x.valor)||0, quem:x.porNome||"", desp:x.id}));
+  const cf=Object.fromEntries((S.comprasFeitas||[]).map(c=>[c.id,c]));
+  S.movimentos.filter(x=>x.tipo==="entrada" && (Number(x.totalCompra)||0)>0).forEach(x=>{ const d=isoDia(x.em); if (d<ini||d>fim) return; const c=cf[x.compraFeita]||{};
+    L.push({dia:d, o:`${x.delta||""}× ${x.nome||(peca(x.pecaId)||{}).nome||"peça"}${x.fornecedor?" · "+x.fornecedor:""}${x.nfCompra?" · NF "+x.nfCompra:""}`, tipo:"Peças para o estoque", forma:c.pagamento||"Não informado", valor:Number(x.totalCompra)||0, quem:x.porNome||""}); });
+  return L.sort((a,b)=>a.dia<b.dia?1:a.dia>b.dia?-1:0); }
+function entradasEntre(ini, fim){ let t=0;
+  S.os.forEach(o=>pagosReais(o.pagamentos).forEach(p=>{ const d=isoDia(p.em); if (d>=ini && d<=fim) t+=Number(p.valor)||0; }));
+  S.vendas.forEach(v=>{ const d=isoDia(v.em); if (d>=ini && d<=fim && v.pagamento!=="A prazo") t+=v.total||0; }); return t; }
+SHELL.saidas = () => `<div class="top"><h1>💸 Tudo que saiu</h1><button class="btn pri" id="sa-novo">+ Lançar uma saída</button></div>
+  <div class="banner" style="margin:0 0 12px">Aqui junta <b>tudo</b> que saiu da retífica: despesas, contas pagas e compras de peças. Escolha o mês e, se quiser, só uma forma de pagamento (ex.: <b>só o cartão</b>) para bater com a fatura.</div>
+  <div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap"><input type="month" id="sa-mes" value="${h(UI.saMes||hojeISO().slice(0,7))}" style="width:auto"><div class="seg" id="sa-f"></div></div>
+  <div class="tiles" id="sa-t"></div>
+  <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(280px,.6fr);align-items:start"><div class="card"><h2 id="sa-tit">Saídas do mês</h2><div class="tbl-wrap" id="sa-l" style="margin-top:8px"></div></div><div class="card"><h2>Para onde foi</h2><div id="sa-c" style="margin-top:8px"></div></div></div>`;
+BIND.saidas = () => { $("#sa-novo").onclick=()=>formDespesa(); $("#sa-mes").onchange=e=>{ UI.saMes=e.target.value; FILL.saidas(); };
+  $("#sa-f").onclick=e=>{ const b=e.target.closest("[data-f]"); if(!b) return; UI.saForma=b.dataset.f; FILL.saidas(); };
+  $("#sa-l").onclick=e=>{ const b=e.target.closest("[data-de]"); if(b) formDespesa(S.despesas.find(x=>x.id===b.dataset.de)); }; };
+FILL.saidas = () => { if (!$("#sa-l")) return;
+  const mes=UI.saMes||hojeISO().slice(0,7), ini=mes+"-01", fim=mes+"-31", T=saidasEntre(ini, fim), formas=[...new Set(T.map(x=>x.forma))].sort();
+  const cartao = f => /cart[aã]o/i.test(f); const fs=UI.saForma||"";
+  $("#sa-f").innerHTML = [["","Todas"], ...(formas.some(cartao)?[["__cartao","💳 Só cartão"]]:[]), ...formas.map(f=>[f,f])].map(([k,t])=>`<button type="button" data-f="${h(k)}" class="${fs===k?"on":""}">${h(t)}</button>`).join("");
+  const L = fs==="__cartao" ? T.filter(x=>cartao(x.forma)) : fs ? T.filter(x=>x.forma===fs) : T;
+  const tot=L.reduce((t,x)=>t+x.valor,0), ent=entradasEntre(ini, fim), totAll=T.reduce((t,x)=>t+x.valor,0);
+  $("#sa-t").innerHTML = `<div class="tile ok"><div class="v num">${money(ent)}</div><div class="l">Entrou no mês</div></div><div class="tile bad"><div class="v num">${money(totAll)}</div><div class="l">Saiu no mês (tudo)</div></div>${fs?`<div class="tile warn"><div class="v num">${money(tot)}</div><div class="l">Saiu ${fs==="__cartao"?"no cartão":"em "+h(fs)}</div></div>`:""}<div class="tile ${ent-totAll>=0?"accent":"bad"}"><div class="v num">${money(ent-totAll)}</div><div class="l">Sobrou no mês</div></div>`;
+  $("#sa-tit").textContent = `Saídas do mês${fs?(fs==="__cartao"?" · só cartão":" · "+fs):""} (${L.length})`;
+  $("#sa-l").innerHTML = L.length ? `<table><tr><th>Data</th><th>O quê</th><th>Tipo</th><th>Pago com</th><th class="n">Valor</th></tr>${L.map(x=>`<tr ${x.desp?`class="click" data-de="${h(x.desp)}" title="Toque para editar"`:""}><td class="num">${dia(x.dia)}</td><td>${h(x.o)}${x.quem?`<br><span class="muted" style="font-size:12px">${h(x.quem)}</span>`:""}</td><td>${h(x.tipo)}</td><td>${h(x.forma)}</td><td class="n"><b>${money(x.valor)}</b></td></tr>`).join("")}<tr><td colspan="4"><b>Total</b></td><td class="n"><b>${money(tot)}</b></td></tr></table>` : `<div class="empty">Nada saiu ${fs?"com essa forma ":""}neste mês.</div>`;
+  const pc={}; L.forEach(x=>pc[x.tipo]=(pc[x.tipo]||0)+x.valor); const pf={}; L.forEach(x=>pf[x.forma]=(pf[x.forma]||0)+x.valor);
+  const tb=o=>`<table>${Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<tr><td>${h(c)}</td><td class="n">${money(v)}</td><td class="n muted" style="width:52px">${tot?(v/tot*100).toFixed(0):0}%</td></tr>`).join("")}</table>`;
+  $("#sa-c").innerHTML = L.length ? `<b style="font-size:14px">Por tipo</b>${tb(pc)}<b style="font-size:14px;display:block;margin-top:12px">Por forma de pagamento</b>${tb(pf)}` : `<div class="empty">—</div>`;
+};
 SHELL.despesas = () => `<div class="top"><h1>Despesas e resultado</h1><button class="btn pri" id="de-novo">Nova despesa</button></div>
   <div class="row" style="gap:8px;margin-bottom:12px"><input type="month" id="de-mes" value="${h(UI.deMes||hojeISO().slice(0,7))}" style="width:auto"></div>
   <div class="tiles" id="de-t"></div><div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(300px,.8fr);align-items:start"><div class="card"><h2>Despesas do mês</h2><div class="tbl-wrap" id="de-l" style="margin-top:8px"></div></div><div class="card"><h2>Por tipo</h2><div id="de-c" style="margin-top:8px"></div></div></div>`;
@@ -4701,7 +4829,7 @@ SHELL.novaos = () => { if (!UI.nv) UI.nv = nvNovo(); const n=UI.nv, ger=direcao(
      <div class="form os" style="margin-top:8px">
        <label class="f meia">Veículo<input id="nv-vei" list="dl-vei" autocomplete="off" value="${h(n.veiculo)}" placeholder="Digite o carro: Kwid, Gol, Atego…"><datalist id="dl-vei">${veicTodos().map(v=>`<option value="${h(v[0]+" "+v[1])}">`).join("")}</datalist></label>
        <label class="f">Placa<input id="nv-pla" value="${h(n.placa)}"></label>
-       <label class="f">Linha<div class="seg" id="nv-lin">${[["leve","Leve"],["pesada","Pesada"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${n.linha===k?"on":""}">${t}</button>`).join("")}</div></label>
+       <label class="f">Linha<div class="seg" id="nv-lin">${LINHAS.map(([k,t])=>`<button type="button" data-k="${k}" class="${n.linha===k?"on":""}">${t}</button>`).join("")}</div></label>
        <label class="f meia">${n.tipo==="solta"?"Motor de origem (opcional)":n.tipo==="pecas"?"De qual motor são (opcional)":"Motor *"}<input id="nv-mot" value="${h(n.motor)}" placeholder="Ex.: AP 1.6, OM 924, DC13"></label>
        <label class="f meia">Nº do motor (no bloco)<input id="nv-nmot" value="${h(n.numMotor)}"></label>
        <div class="wide" id="nv-mv"></div>
@@ -4726,9 +4854,9 @@ SHELL.novaos = () => { if (!UI.nv) UI.nv = nvNovo(); const n=UI.nv, ger=direcao(
        <div class="f wide" id="nv-cal"></div>
        <label class="f">Previsão de entrega<input id="nv-prev" type="date" value="${h(n.previsao)}"><span id="nv-sug" style="font-size:13px"></span></label>
 
-       <div class="f wide" id="nv-camw"></div>
-       ${direcao()?`<label class="f">Ou mandar direto para o setor<select id="nv-set"><option value="">— seguir o caminho —</option>${S.setores.map(x=>`<option ${n.setor===x?"selected":""}>${h(x)}</option>`).join("")}</select></label>
-       <label class="f">Mecânico<select id="nv-res"><option value="">— definir depois —</option>${S.funcionarios.filter(f=>f.ativo!==false&&f.papel==="funcionario").map(f=>`<option value="${f.id}" ${n.responsavel===f.id?"selected":""}>${h(f.nome)}</option>`).join("")}</select></label>
+       <div class="f wide" id="nv-camw" ${OFICINA?"":"hidden"}></div>
+       ${direcao()?`${OFICINA?`<label class="f">Ou mandar direto para o setor<select id="nv-set"><option value="">— seguir o caminho —</option>${S.setores.map(x=>`<option ${n.setor===x?"selected":""}>${h(x)}</option>`).join("")}</select></label>
+       <label class="f">Mecânico<select id="nv-res"><option value="">— definir depois —</option>${S.funcionarios.filter(f=>f.ativo!==false&&f.papel==="funcionario").map(f=>`<option value="${f.id}" ${n.responsavel===f.id?"selected":""}>${h(f.nome)}</option>`).join("")}</select></label>`:""}
        <label class="f">Prioridade<select id="nv-pri"><option value="normal">Normal</option><option value="urgente" ${n.prioridade==="urgente"?"selected":""}>Urgente</option></select></label>`:""}
      </div></section>
   </div>
@@ -4743,6 +4871,8 @@ SHELL.novaos = () => { if (!UI.nv) UI.nv = nvNovo(); const n=UI.nv, ger=direcao(
     <button class="btn" id="nv-can" style="width:100%;justify-content:center">Cancelar</button></aside></div>`; };
 function nvFalta(){ const n=UI.nv, c=nvCli(), f=[]; if (n.origemTipo && n.origemTipo!=="cliente" && !String(n.origemNome||"").trim()) f.push(n.origemTipo==="empresa"?"nome da empresa de onde veio":"de qual motor veio");
   if (!c && !(n.novo && n.novo.nome && n.novo.telefone)) f.push("cliente com telefone");
+  else if (!c && n.novo && faltaDadosCli(n.novo).length) f.push("dados do cliente ("+faltaDadosCli(n.novo).join(", ")+")");
+  else if (c && cadastroIncompleto(c)) f.push("completar o cadastro do cliente ("+faltaDadosCli({pessoa:c.pessoa||"F", doc:c.doc, endereco:c.endereco||{cidade:c.cidade}}).join(", ")+") · toque em Completar agora");
   if (n.tipo==="solta"){ if (!n.solta || (n.solta==="Outra" && !n.soltaOutra.trim())) f.push("qual peça veio"); }
   else if (n.tipo==="pecas"){ if (!nvPecasM(n).length) f.push("quais peças vieram"); }
   else if (!n.motor.trim()) f.push("motor");
@@ -4781,38 +4911,51 @@ function nvAtualiza(){ if (!UI.nv || !$("#nv-tot")) return; $("#nv-tot").textCon
 async function nvSalvarCliente(silencioso){
   const n=UI.nv; if (!n || !n.novo) return null; const v=n.novo;
   if (!v.nome.trim() || !v.telefone){ if (!silencioso) toast("Preencha o nome e o WhatsApp com DDD."); return null; }
+  const fl=faltaDadosCli(v); if (fl.length){ if (!silencioso) toast("Falta: "+fl.join(", ")); return null; }
   const dg=v.telefone.replace(/\D/g,""), ex=S.clientes.find(x=>String(x.telefone||"").replace(/\D/g,"")===dg || norm(x.nome)===norm(v.nome));
   let c=ex;
-  if (!ex){ const d={nome:v.nome.trim(), telefone:v.telefone.trim(), email:(v.email||"").trim(), tipo:"comum", doc:"", cidade:"", obs:"", criadoEm:Date.now(), criadoPor:me.id, criadoPorNome:me.nome};
+  if (!ex){ const d={nome:v.nome.trim(), telefone:v.telefone.trim(), email:(v.email||"").trim(), tipo:"comum", pessoa:v.pessoa||"F", doc:v.doc||"", endereco:v.endereco||{}, cidade:(v.endereco||{}).cidade||"", veiculos:[], obs:"", criadoEm:Date.now(), criadoPor:me.id, criadoPorNome:me.nome};
     const r=await db.collection("clientes").add(d); c=Object.assign({id:r.id}, d); if (!S.clientes.some(x=>x.id===r.id)) S.clientes.push(c); }
   if (UI.nv===n){ n.cliId=c.id; n.novo=null; if ($("#nv-cli")){ nvRenderCli(); nvAtualiza(); } }
-  if (!silencioso) toast(ex?`Esse cliente já estava cadastrado: ${ex.nome}`:"💾 Cliente salvo");
+  if (!silencioso){ toast(ex?`Esse cliente já estava cadastrado: ${ex.nome}`:"💾 Cliente salvo · agora o carro 🚗"); nvIrCarro(); }
   return c; }
+function nvIrCarro(){ setTimeout(()=>{ const i=$("#nv-vei"); if (!i) return; const sec=i.closest("section")||i; sec.scrollIntoView({behavior:"smooth", block:"start"}); sec.style.outline="3px solid var(--accent)"; setTimeout(()=>{ sec.style.outline=""; }, 2500); if (!(UI.nv&&UI.nv.tipo!=="motor")) i.focus({preventScroll:true}); }, 150); }
 function nvRenderCli(){
   const n=UI.nv, c=nvCli(), el=$("#nv-cli");
   if (c){ const os=S.os.filter(o=>(o.clienteId===c.id||o.cliente===c.nome)&&visivelLoj(o)).sort((a,b)=>b.criadoEm-a.criadoEm), wa=foneWa(c.telefone);
     el.innerHTML = `<div class="nv-clicard"><div style="flex:1"><b style="font-size:18px">${c.prioritario?"⭐ ":""}${h(c.nome)}</b>${c.prioritario?` <span class="pill p-execucao">⭐ Prioritário</span>`:""} <span class="pill ${tipoCli(c)==="contrato"?"p-execucao":"p-orcamento"}">${h(TIPOS_CLI[tipoCli(c)])}</span>
       <div style="margin-top:4px">📞 ${c.telefone?`<a href="tel:${h(String(c.telefone).replace(/\D/g,""))}">${h(c.telefone)}</a>`:`<span style="color:var(--bad)">sem telefone</span>`}${c.cidade?` · ${h(c.cidade)}`:""}${c.doc?` · ${h(c.doc)}`:""}</div>
+      ${cadastroIncompleto(c)?`<div style="margin-top:6px;color:var(--warn);font-size:14px">⚠️ <b>Cadastro incompleto</b> (a OS só sai depois de completar): falta ${h(faltaDadosCli({pessoa:c.pessoa||"F", doc:c.doc, endereco:c.endereco||{cidade:c.cidade}}).join(", "))} <button type="button" class="btn sm" id="nv-ccomp">Completar agora</button></div>`:""}
+      <div style="margin-top:6px"><b style="font-size:14px">🚗 Carros:</b> <span id="nv-cars">${(c.veiculos||[]).map((v,i)=>`<button type="button" class="chip ${n.carroI===i?"on":""}" data-car="${i}" style="margin:2px 4px 2px 0">${h(descCarro(v))}</button>`).join("")}<button type="button" class="chip" data-car="novo" style="margin:2px 0">＋ Carro novo</button></span></div>
       <div class="muted" style="font-size:13px;margin-top:2px">${os.length?`${os.length} OS antes · última: #${os[0].numero} ${h(os[0].motor||"")} (${dt(os[0].criadoEm)})`:"Primeira vez na retífica"}</div></div>
       <div class="row" style="gap:6px">${wa?`<a class="btn" target="_blank" rel="noopener" href="https://wa.me/${wa}">💬 WhatsApp</a>`:""}<button type="button" class="btn" id="nv-troca">Trocar cliente</button></div></div>`;
-    $("#nv-troca").onclick=()=>{ n.cliId=null; n.novo=null; nvRenderCli(); nvAtualiza(); }; return; }
+    $("#nv-troca").onclick=()=>{ n.cliId=null; n.novo=null; n.carroI=null; nvRenderCli(); nvAtualiza(); };
+    const cp=$("#nv-ccomp"); if (cp) cp.onclick=()=>formCli(c);
+    $("#nv-cars").onclick=e=>{ const b=e.target.closest("[data-car]"); if(!b) return;
+      if (b.dataset.car==="novo"){ n.carroI=null; nvPreencheCarro({}); nvRenderCli(); nvIrCarro(); return; }
+      const v=(c.veiculos||[])[+b.dataset.car]; if (!v) return; n.carroI=+b.dataset.car; nvPreencheCarro(v); nvRenderCli(); toast("🚗 "+descCarro(v)+" preenchido"); };
+    return; }
   if (n.novo){ const v=n.novo;
     el.innerHTML = `<div class="form os" style="margin-top:8px"><label class="f meia">Nome do cliente *<input id="nc-n" value="${h(v.nome)}"></label><label class="f">WhatsApp / telefone *<div class="row" style="gap:6px;flex-wrap:nowrap"><input id="nc-ddd" value="${h(v.ddd||"")}" placeholder="DDD" inputmode="numeric" maxlength="2" style="width:62px;text-align:center"><input id="nc-num" value="${h(v.num||"")}" placeholder="99999-9999" inputmode="numeric" maxlength="10" style="flex:1"></div></label>
       <label class="f">E-mail (opcional)<input id="nc-e" type="email" value="${h(v.email||"")}" placeholder="nome@email.com"></label>
-      <div class="f wide row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn sm pri" id="nc-salvar">💾 Salvar cliente</button><button type="button" class="btn sm" id="nc-x">← Procurar cliente já cadastrado</button></div></div>`;
+      ${htmlDadosCli(v,"nc")}
+      <div class="f wide row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn sm pri" id="nc-salvar">💾 Salvar cliente e ir para o carro</button><button type="button" class="btn sm" id="nc-x">← Procurar cliente já cadastrado</button></div></div>`;
     $("#nc-n").oninput=e=>{ v.nome=e.target.value; nvAtualiza(); }; $("#nc-e").oninput=e=>{ v.email=e.target.value.trim(); };
     const fone=()=>{ v.telefone = v.ddd && v.ddd.length===2 && v.num.replace(/\D/g,"").length>=8 ? `(${v.ddd}) ${v.num}` : ""; nvAtualiza(); };
     $("#nc-ddd").oninput=e=>{ v.ddd=e.target.value.replace(/\D/g,"").slice(0,2); e.target.value=v.ddd; if (v.ddd.length===2) $("#nc-num").focus(); fone(); };
     $("#nc-num").oninput=e=>{ let d=e.target.value.replace(/\D/g,"").slice(0,9); e.target.value = d.length>5 ? (d.length===9?`${d.slice(0,5)}-${d.slice(5)}`:`${d.slice(0,4)}-${d.slice(4)}`) : d; v.num=e.target.value; fone(); };
     $("#nc-x").onclick=()=>{ n.novo=null; nvRenderCli(); nvAtualiza(); };
+    ligarDadosCli(el, "nc", d=>{ Object.assign(v, d); nvAtualiza(); });
     $("#nc-salvar").onclick=async e=>{ e.target.disabled=true; try{ await nvSalvarCliente(false); }catch(err){ erro(err); } if (e.target.isConnected) e.target.disabled=false; }; return; }
   el.innerHTML = `<div class="row" style="margin-top:8px"><input id="nv-cq" type="search" value="${h(n.q)}" placeholder="Digite o nome ou o telefone do cliente" style="flex:1;min-width:240px;font-size:16px" autocomplete="off"><button type="button" class="btn pri" id="nv-cnovo">＋ Cliente novo</button></div><div id="nv-cres" style="margin-top:6px"></div>`;
   const res=()=>{ const q=norm(n.q), qd=n.q.replace(/\D/g,""); const l = q.length<2 && qd.length<3 ? [] : S.clientes.filter(c=>norm(c.nome).includes(q) || (qd.length>=3 && String(c.telefone||"").replace(/\D/g,"").includes(qd))).slice(0,6);
     $("#nv-cres").innerHTML = l.map(c=>`<button type="button" class="nv-res" data-c="${c.id}"><b>${h(c.nome)}</b> <span class="muted">${h(c.telefone||"sem telefone")}${c.cidade?" · "+h(c.cidade):""}</span></button>`).join("") || (q.length>=2?`<div class="muted" style="padding:6px">Nenhum cliente encontrado. Use <b>＋ Cliente novo</b>.</div>`:""); };
   $("#nv-cq").oninput=e=>{ n.q=e.target.value; res(); }; res();
-  $("#nv-cres").onclick=e=>{ const b=e.target.closest("[data-c]"); if(!b) return; n.cliId=b.dataset.c; nvRenderCli(); nvAtualiza(); };
+  $("#nv-cres").onclick=e=>{ const b=e.target.closest("[data-c]"); if(!b) return; n.cliId=b.dataset.c; n.carroI=null; nvRenderCli(); nvAtualiza(); const cl=nvCli(); if (cl && (cl.veiculos||[]).length===1){ n.carroI=0; nvPreencheCarro(cl.veiculos[0]); nvRenderCli(); } else nvIrCarro(); };
   $("#nv-cnovo").onclick=()=>{ const t=n.q.replace(/\D/g,"").length>=8; const dg=n.q.replace(/\D/g,""); n.novo={nome:t?"":n.q, telefone:"", ddd:t&&dg.length>=10?dg.slice(0,2):"", num:t?(dg.length>=10?dg.slice(2):dg):"", tipo:"comum", doc:"", cidade:""}; if (n.novo.ddd && n.novo.num) n.novo.telefone=`(${n.novo.ddd}) ${n.novo.num}`; nvRenderCli(); nvAtualiza(); setTimeout(()=>$(t?"#nc-n":"#nc-ddd").focus(),30); };
 }
+function nvPreencheCarro(v){ const set=(id,val)=>{ const i=$(id); if (!i) return; i.value=val||""; i.dispatchEvent(new Event("input",{bubbles:true})); i.dispatchEvent(new Event("change",{bubbles:true})); };
+  set("#nv-vei", v.veiculo); set("#nv-pla", v.placa); if ($("#nv-mot")) set("#nv-mot", v.motor); set("#nv-nmot", v.numMotor); }
 function nvRenderServ(){
   const n=UI.nv, tab=precosDaLinha(n.linha), q=norm(($("#nv-sq")||{}).value||"");
   $("#nv-sl").innerHTML = tab.filter(p=>!q||norm(p.desc).includes(q)).map(p=>{ const on=n.servs.has(p.desc), sp=p.valor==null; return `<button type="button" class="fz-opt ${on?"on":""}" data-s="${h(p.desc)}" ${sp?"disabled style='opacity:.45'":""} style="padding:8px 10px"><b style="font-size:14px">${on?"✓ ":""}${h(p.desc)}</b><small>${sp?"sem preço · peça ao chefe":money(p.valor)}</small></button>`; }).join("") || `<div class="muted">${tab.length?"Nenhum serviço com esse nome.":"A tabela de preços está vazia. O chefe precisa cadastrar os serviços."}</div>`;
@@ -4852,7 +4995,7 @@ BIND.novaos = () => {
     const g = nz(n.veiculo).length>=3 ? ` <a href="${googleMotor(n.veiculo.trim())}" target="_blank" rel="noopener" class="btn sm" style="margin-left:4px">🔎 Conferir no Google</a>` : "";
     if (!lista.length && k.length>=3 && !P && mvK!==k){ clearTimeout(mvT); mvK=k; mvT=setTimeout(()=>{ mvK=null; if (nz(n.veiculo)===k) pesquisarMotores(n.veiculo, mv); else mv(); }, 900); }
     $("#nv-mv").innerHTML = (!lista.length && k.length>=3 ? `<div class="muted" style="font-size:13px;margin-top:4px">${P&&P.st==="buscando"?"🔎 Pesquisando os motores desse veículo…":P&&P.st==="nada"?"Não achei com certeza os motores desse veículo. Confira no Google e digite o motor no campo ao lado: ele fica salvo para a próxima vez.":P&&P.st==="erro"?"Não deu para pesquisar agora. Confira no Google e digite o motor: ele fica salvo para a próxima vez.":"🔎 Vou pesquisar os motores desse veículo…"}${g}</div>` : lista.length ? `<div class="nv-mv"><span class="muted">${v?`Motores do <b style="color:var(--ink)">${h(v[0]+" "+v[1])}</b>`:"Motores já usados com esse carro"} · toque para escolher:</span> ${lista.map(m=>`<button type="button" class="chip ${norm(n.motor)===norm(m)?"on":""}" data-mv="${h(m)}">${h(m)}</button>`).join("")}${P&&P.st==="ok"?`<div class="muted" style="font-size:12px;margin-top:4px">Pesquisado automaticamente e salvo. Confira na plaqueta do motor.${g}</div>`:""}</div>` : ""); };
-  $("#nv-vei").addEventListener("input", ()=>{ const v=veicAchar(n.veiculo); if (v && v[2]!==n.linha && !n.servs.size){ n.linha=v[2]; $("#nv-lin").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.k===n.linha)); nvRenderServ(); } mv(); });
+  $("#nv-vei").addEventListener("input", ()=>{ const v0=veicAchar(n.veiculo), v=(/scania/i.test(n.veiculo)||(v0&&/scania/i.test(v0[0]))) ? [v0?v0[0]:"Scania", v0?v0[1]:"", "scania", v0?v0[3]:[]] : v0; if (v && v[2]!==n.linha && !n.servs.size){ n.linha=v[2]; $("#nv-lin").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.k===n.linha)); nvRenderServ(); } mv(); });
   $("#nv-mot").addEventListener("input", mv);
   $("#nv-mv").onclick=e=>{ const b=e.target.closest("[data-mv]"); if(!b) return; n.motor=b.dataset.mv; $("#nv-mot").value=n.motor; mv(); nvAtualiza(); };
   mv();
@@ -4886,7 +5029,7 @@ BIND.novaos = () => {
       ${htmlBlocoAssinatura()}
       <div class="acts"><button class="btn" id="ca-x">Voltar</button><button class="btn pri" id="ca-ok">Lançar OS</button></div>`, m=>{
       n.como=n.como||COMO_APROV[0]; m.querySelectorAll("[data-c]").forEach(x=>x.classList.toggle("on",x.dataset.c===n.como));
-      const cl=nvCli(); const AS=ligarBlocoAssinatura(m, ()=>n.como, termoAprovacao({motor:nvMotorTxt(n), numMotor:n.numMotor}, nvTot(), n.previsao), cl?cl.nome:"");
+      const cl=nvCli(); const AS=ligarBlocoAssinatura(m, ()=>n.como, termoAprovacao({motor:nvMotorTxt(n), numMotor:n.numMotor}, nvTot(), n.previsao), cl?cl.nome:"", cl?cl.doc:"");
       const zw=()=>{ $("#ca-zapw",m).hidden = !(n.como!=="Pessoalmente" && ponteUrl()); }; zw();
       $("#ca-c",m).onclick=e=>{ const b=e.target.closest("[data-c]"); if(!b) return; n.como=b.dataset.c; m.querySelectorAll("[data-c]").forEach(x=>x.classList.toggle("on",x===b)); AS.atual(); zw(); };
       $("#ca-zap",m).onclick=()=>{ const cl=nvCli(); if (!(cl && foneWa(cl.telefone)) && !foneWa(n.telefone||"")){ /* sem telefone: ainda salva, e a tela seguinte avisa */ } fecharModal(); n.aprovou=false; nvLancar(); };
@@ -4921,8 +5064,10 @@ async function nvLancar(){
       for (const f of n.fotos){ try{ const blob = f.file.type==="image/gif" ? f.file : await comprimir(f.file); const r=await assets.upload(blob, {type:blob.type||"image/jpeg"}); const em=Date.now(); fotosEnv.push(r.id);
         d.fotos.push({id:r.id, em, por:me.id, porNome:me.nome, etapa:"Chegada"}); hist.push({em, por:me.id, porNome:me.nome, txt:"Foto adicionada (chegada do motor)", foto:r.id}); }catch(err){ toast("Uma foto não foi enviada. Coloque de novo dentro da OS."); } } }
     { const cm=(n.tipo==="pecas"&&n.caminhoId==="pecas"?caminhoPara("pecas"):camPorId(n.caminhoId)) || caminhoPara(n.tipo, d.pecaSolta); if (cm) d.caminho={id:cm.id||"", nome:cm.nome, etapas:cm.etapas.map(g=>({s:g.slice()}))}; if (cm.aval!=null) d.caminho.aval=cm.aval; }
-    if (n.aprovou && !n.setor && d.caminho) iniciarCaminho(d);
+    if (!OFICINA){ delete d.caminho; d.setor=""; d.responsavel=""; }
+    if (OFICINA && n.aprovou && !n.setor && d.caminho) iniciarCaminho(d);
     await selarHist(d); const ref=await db.collection("os").add(d); aprenderVeiculo(n.veiculo, n.motor, n.linha);
+    if (n.tipo!=="solta" && (d.veiculo||d.placa)) salvarCarro(S.clientes.find(x=>x.id===c.id)||c, {veiculo:d.veiculo, placa:d.placa, motor:n.motor.trim(), numMotor:d.numMotor, em:agora}).catch(()=>{});
     UI.nv=null; nvSucesso(Object.assign({id:ref.id}, d), c);
   }catch(err){ erro(err); b.disabled=false; b.textContent=txt0;
     for (const [pid,q,num] of movidos){ try{ await mexerEstoque(pid, q, {tipo:"ajuste", obs:`Devolvido: a OS ${num} não chegou a ser salva`}); }catch(e){ registrarFalha(e); } }
@@ -4937,7 +5082,7 @@ function nvSucesso(o, c){
       ${!o.pecasMotor&&!o.pecaSolta&&o.qtdPecas?`<div style="text-align:left;margin-top:8px;font-size:15px"><b>🔩 Peças deste motor:</b> ${h(txtPecasMotor(o))}<div class="muted" style="font-size:13px">Etiquetas: ${PECAS_MOTOR_ETQ.filter(pc=>qtdPeca(o,pc)>0).map(pc=>`<b class="mono">${h(letraPeca(pc))}-${h(String(o.numero))}</b>`).join(" · ")}</div><button class="btn sm" id="sx-etqp" style="margin-top:6px">🏷️ Imprimir etiquetas das peças</button></div>`:""}
       ${o.pecasMotor&&o.pecasMotor.length?`<div style="text-align:left;margin-top:8px;font-size:15px"><b>🧩 Escreva em cada peça:</b>${o.pecasMotor.map(pc=>`<div><b class="mono" style="font-size:20px">${h(letraPeca(pc))}-${h(String(o.numero))}</b> ${h(pc)}</div>`).join("")}<button class="btn sm" id="sx-etqp" style="margin-top:6px">🏷️ Imprimir etiquetas das peças</button></div>`:""}</div>
     <div style="font-size:16px">${h(c.nome)} · ${h(o.motor)} · <b>${money(totalOS(o))}</b></div>
-    <div class="muted">${o.status==="orcamento"?"Ainda <b>não foi lançado</b> na oficina. Mande para o cliente. Quando ele aprovar, vá em <b>Minhas OS</b> e toque em <b>✅ Aprovou · Lançar</b>.":(o.setor?`Lançada e já está na tela do mecânico (${h(o.setor)}).`:"Lançada. Toque em <b>🔧 Mandar para a oficina</b> na OS, ou o gerente manda.")}</div>
+    <div class="muted">${o.status==="orcamento"?"Ainda <b>não foi lançado</b> na oficina. Mande para o cliente. Quando ele aprovar, vá em <b>Minhas OS</b> e toque em <b>✅ Aprovou · Lançar</b>.":(!OFICINA?"Lançada: está <b>na oficina</b>. Quando ficar pronta, o gerente marca <b>🏁 Pronta</b> e aparece para você avisar o cliente.":o.setor?`Lançada e já está na tela do mecânico (${h(o.setor)}).`:"Lançada. Toque em <b>🔧 Mandar para a oficina</b> na OS, ou o gerente manda.")}</div>
     <div class="grid" style="gap:8px">
       ${wa?`<a class="btn ${o.status==="orcamento"||sxTk?"pri":""}" id="sx-wa" style="justify-content:center;flex-direction:column;gap:2px" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(sxMsg)}">💬 ${o.status==="orcamento"?"Mandar orçamento":"Mandar a OS"} no WhatsApp${sxTk?`<span style="font-size:13px;font-weight:600">✍️ já vai com o link para o cliente ${sxAprovar?"aprovar e assinar":"assinar"}</span>`:""}</a>`:`<div class="banner warn" style="margin:0">Cliente sem telefone: não dá para mandar no WhatsApp.</div>`}
       ${o.entrada?`<button class="btn" id="sx-ent" style="justify-content:center">🖨 Imprimir ficha de entrada para o cliente assinar</button>`:""}
@@ -5863,7 +6008,7 @@ function formCompraFeita(){
         const ref=await db.collection("comprasFeitas").add({dia:dia0, fornecedor, nf, pagamento:pag, vencimento:/prazo|boleto/i.test(pag)?$("#cf-v",m).value:null, itens:itens.map(x=>({pecaId:x.pecaId, nome:x.nome, qtd:x.qtd, custo:x.custo, total:Math.round(x.qtd*x.custo*100)/100, cat:x.pecaId?"Peças (estoque)":(x.cat||"Outros"), osId:x.osId||null})), total, foto:fid, em:Date.now(), por:me.id, porNome:me.nome});
         for (const x of itens){
           if (x.pecaId){ await mexerEstoque(x.pecaId, x.qtd, {tipo:"entrada", obs:`Compra ${fornecedor}${nf?` · NF ${nf}`:""}`, custoUnit:x.custo, totalCompra:x.custo*x.qtd, fornecedor, nfCompra:nf, compraFeita:ref.id}); }
-          else await db.collection("despesas").add({dia:dia0, categoria:x.cat||"Outros", desc:`${x.qtd}× ${x.nome} · ${fornecedor}${nf?` · NF ${nf}`:""}`, valor:Math.round(x.qtd*x.custo*100)/100, porNome:me.nome, criadoEm:Date.now(), atualizadoEm:Date.now(), compraFeita:ref.id});
+          else await db.collection("despesas").add({dia:dia0, categoria:x.cat||"Outros", desc:`${x.qtd}× ${x.nome} · ${fornecedor}${nf?` · NF ${nf}`:""}`, forma:pag, valor:Math.round(x.qtd*x.custo*100)/100, porNome:me.nome, criadoEm:Date.now(), atualizadoEm:Date.now(), compraFeita:ref.id});
           if (x.compraId) await db.doc("compras/"+x.compraId).update({status:"chegou", chegouEm:Date.now(), chegouPorNome:me.nome}).catch(()=>{}); }
         auditar("Compras", `${fornecedor} ${money(total)}`, null, {fornecedor, nf, total, itens:itens.length});
         fecharModal(); toast(`✅ Compra de ${money(total)} registrada${itens.some(x=>x.pecaId)?" · estoque atualizado":""}`); }catch(err){ erro(err); b.disabled=false; } };
@@ -6116,10 +6261,10 @@ FILL.equipe = () => {
     <td class="n">${S.os.filter(o=>o.responsavel===f.id&&["aberta","execucao","aguardando"].includes(o.status)).length}</td><td class="n" style="white-space:nowrap">${ehChefe()&&f.id!==me.id&&f.ativo!==false&&!f.dono?`<button class="btn sm" data-comoid="${f.id}">👁 Entrar como</button> `:""}${f.papel==="chefe"&&!ehChefe()?"":`<button class="btn sm" data-ed="${f.id}">Editar</button>`}${podeExcluirFunc(f)?` <button class="btn sm danger" data-exf="${f.id}">Excluir</button>`:""}</td></tr>`).join("")}</table>`;
 };
 function formFunc(f){
-  const novo=!f; f=f||{papel:"funcionario", ativo:true};
+  const novo=!f; f=f||{papel:OFICINA?"funcionario":"lojista", ativo:true};
   abrirModal(`<h2>${novo?"Cadastrar pessoa":"Editar "+h(f.nome)}</h2><form id="ff" class="form">
     <label class="f wide">Nome<input id="f-n" required maxlength="40" value="${h(f.nome)}"></label>
-    <label class="f">Função<select id="f-p">${Object.entries(PAPEL).map(([k,t])=>`<option value="${k}" ${f.papel===k?"selected":""}>${t}</option>`).join("")}</select></label>
+    <label class="f">Função<select id="f-p">${Object.entries(PAPEL).filter(([k])=>OFICINA||k!=="funcionario"||f.papel===k).map(([k,t])=>`<option value="${k}" ${f.papel===k?"selected":""}>${t}${!OFICINA&&k==="funcionario"?" (desligado na fase 1)":""}</option>`).join("")}</select></label>
     <div class="f wide" id="f-setwrap"><span>Setores em que trabalha <span class="muted">(pode marcar vários · nenhum = ajuda em toda a oficina pelo nome)</span></span><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px">${S.setores.map(x=>`<label class="chip" style="cursor:pointer"><input type="checkbox" class="f-sx" value="${h(x)}" ${setoresDe(f).includes(x)?"checked":""}> ${h(x)}</label>`).join("")}</div></div>
     <label class="f">Senha <span class="muted" id="f-pinreg"></span><input id="f-pin" class="pin" maxlength="8" autocomplete="off" autocapitalize="off" ${novo?"required":""} placeholder="${novo?"":"carregando…"}"></label>
     <div class="wide row" style="gap:14px">${avatar(f)}<label class="f" style="flex:1">Foto (aparece na tela de entrada)<input id="f-foto" type="file" accept="image/*" ${assets?"":"disabled"}></label></div>
