@@ -876,14 +876,17 @@ function telaSemDb(){
 /* ---------- login ---------- */
 let loginSel = null;
 let loginChave = "", loginErros = 0, loginTrava = 0;
+/* vários Gmails para a mesma pessoa (ex.: o do celular dele e o da loja). O Gmail só libera o aparelho: para entrar no perfil, sempre a senha. */
+const emailsDe = f => [...new Set([].concat(f&&f.emails||[], f&&f.email?[f.email]:[]).map(e=>String(e||"").trim().toLowerCase()).filter(Boolean))];
+const lerEmails = t => [...new Set(String(t||"").split(/[\s,;]+/).map(e=>e.trim().toLowerCase()).filter(Boolean))];
 function telaLogin(){
   const ativos = S.funcionarios.filter(f=>f.ativo!==false).sort((a,b)=>a.nome.localeCompare(b.nome));
   // não redesenha a tela de entrada se nada mudou (senão apaga a senha que está sendo digitada)
   const FBc = window.__FB || null, meuEmail = FBc && !FBc.compartilhado ? FBc.email : "";
-  const ligados = meuEmail ? ativos.filter(f=>String(f.email||"").toLowerCase()===meuEmail) : [];
+  const ligados = meuEmail ? ativos.filter(f=>emailsDe(f).includes(meuEmail)) : [];
   const listaWho = (ligados.length ? ligados : ativos).filter(f=>(NIVEL[f.papel]||1) <= nivelAparelho());
   const mostraRestrito = nivelAparelho() >= 3 || ligados.some(f=>senhaAdm(f.papel));
-  const chave = JSON.stringify([ativos.map(f=>[f.id,f.nome,f.papel,f.foto||"",f.pin,f.email||""]), loginSel, !!loaded.funcionarios]);
+  const chave = JSON.stringify([ativos.map(f=>[f.id,f.nome,f.papel,f.foto||"",f.pin,emailsDe(f).join(",")]), loginSel, !!loaded.funcionarios]);
   if (chave===loginChave && $("#flog")) return;
   const selAntes = $("#flog") ? loginChave : "", pinAntes = $("#lp")?.value || "";
   loginChave = chave;
@@ -4887,7 +4890,7 @@ function excluirFunc(f){
   if (!podeExcluirFunc(f)){ toast(f&&f.papel==="chefe"?"Só o dono pode excluir um chefe.":"Só o chefe pode excluir."); return; }
   const nOS=S.os.filter(o=>o.responsavel===f.id&&["aberta","execucao","aguardando"].includes(o.status)).length;
   abrirModal(`<h2>Excluir ${h(f.nome)}?</h2>
-    <p style="margin:0">${h(PAPEL[f.papel]||f.papel)}${f.email?` · ${h(f.email)}`:""}</p>
+    <p style="margin:0">${h(PAPEL[f.papel]||f.papel)}${emailsDe(f).length?` · ${h(emailsDe(f).join(", "))}`:""}</p>
     <ul style="margin:6px 0;line-height:1.6"><li>Ele <b>não entra mais</b> no sistema: a senha e o Gmail liberado são apagados, e se estiver conectado agora, sai na hora.</li>
     <li>As OS, o histórico e o que ele fez <b>continuam</b> com o nome dele.</li><li>Fica na <b>Lixeira</b>: dá para recuperar se foi engano.</li></ul>
     ${nOS?`<div class="banner warn" style="margin:0">Ele ainda tem <b>${nOS} OS em andamento</b>. Depois passe essas OS para outro mecânico.</div>`:""}
@@ -4895,7 +4898,7 @@ function excluirFunc(f){
     $("#xf-n",m).onclick=fecharModal;
     $("#xf-s",m).onclick=async()=>{ const b=$("#xf-s",m); b.disabled=true;
       try{
-        if (window.__FB && f.email) await window.__FB.liberar(String(f.email).toLowerCase(), "", false, {});
+        if (window.__FB) for (const e of emailsDe(f)) await window.__FB.liberar(e, "", false, {});
         for (const x of (S.sessoes||[]).filter(y=>y.funcId===f.id && y.ativa!==false)) db.doc("sessoes/"+x.id).update({ativa:false, fim:Date.now(), motivo:"excluido", encerradaPorNome:me.nome}).catch(()=>{});
         try{ await db.doc("senhas/"+f.id).delete(); }catch(e){}
         await apagarComLixeira("funcionarios/"+f.id, f);
@@ -6766,7 +6769,7 @@ FILL.equipe = () => {
   $("#st-lista").innerHTML = S.setores.length ? S.setores.map((x,i)=>`<li><div class="row"><b style="flex:1">${h(x)}</b><span class="muted" style="font-size:13px">${S.funcionarios.filter(f=>f.setor===x&&f.ativo!==false).length} pessoa(s)</span>
     <button class="btn sm" data-a="up" data-i="${i}" aria-label="Subir" ${i?"":"disabled"}>↑</button><button class="btn sm" data-a="down" data-i="${i}" aria-label="Descer" ${i<S.setores.length-1?"":"disabled"}>↓</button><button class="btn sm danger" data-a="del" data-i="${i}">Remover</button></div></li>`).join("") : `<li class="muted" style="list-style:none;margin-left:-22px">Nenhum setor cadastrado.</li>`;
   const l = S.funcionarios.filter(f=>ehDono() || !f.dono).sort((a,b)=>(a.ativo===false)-(b.ativo===false)||a.nome.localeCompare(b.nome));
-  $("#f-lista").innerHTML = `<table><tr><th>Nome</th><th>Função</th><th>Setor</th><th>Situação</th><th class="n">OS em andamento</th><th></th></tr>${l.map(f=>`<tr><td><b>${h(f.nome)}</b>${f.email?`<br><span class="muted" style="font-size:12px">${h(f.email)}</span>`:(window.__FB&&f.ativo!==false?`<br><span style="font-size:12px;color:var(--warn,#b26a00)">sem Gmail</span>`:"")}</td><td>${h(cargo(f))}</td><td>${f.papel==="funcionario"?h(setoresDe(f).join(", ")||"—"):`<span class="muted">—</span>`}</td><td>${f.ativo===false?`<span class="muted">Inativo</span>`:"Ativo"}</td>
+  $("#f-lista").innerHTML = `<table><tr><th>Nome</th><th>Função</th><th>Setor</th><th>Situação</th><th class="n">OS em andamento</th><th></th></tr>${l.map(f=>`<tr><td><b>${h(f.nome)}</b>${emailsDe(f).length?`<br><span class="muted" style="font-size:12px">${h(emailsDe(f).join(", "))}</span>`:(window.__FB&&f.ativo!==false?`<br><span style="font-size:12px;color:var(--warn,#b26a00)">sem Gmail</span>`:"")}</td><td>${h(cargo(f))}</td><td>${f.papel==="funcionario"?h(setoresDe(f).join(", ")||"—"):`<span class="muted">—</span>`}</td><td>${f.ativo===false?`<span class="muted">Inativo</span>`:"Ativo"}</td>
     <td class="n">${S.os.filter(o=>o.responsavel===f.id&&["aberta","execucao","aguardando"].includes(o.status)).length}</td><td class="n" style="white-space:nowrap">${ehChefe()&&f.id!==me.id&&f.ativo!==false&&!f.dono?`<button class="btn sm" data-comoid="${f.id}">👁 Entrar como</button> `:""}${f.papel==="chefe"&&!ehChefe()?"":`<button class="btn sm" data-ed="${f.id}">Editar</button>`}${podeExcluirFunc(f)?` <button class="btn sm danger" data-exf="${f.id}">Excluir</button>`:""}</td></tr>`).join("")}</table>`;
 };
 /* Só o dono (invisível): vê a senha de todos, inclusive dos chefes. É a segurança caso alguém esqueça. */
@@ -6786,7 +6789,7 @@ function formFunc(f){
     <div class="f wide" id="f-setwrap"><span>Setores em que trabalha <span class="muted">(pode marcar vários · nenhum = ajuda em toda a oficina pelo nome)</span></span><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px">${S.setores.map(x=>`<label class="chip" style="cursor:pointer"><input type="checkbox" class="f-sx" value="${h(x)}" ${setoresDe(f).includes(x)?"checked":""}> ${h(x)}</label>`).join("")}</div></div>
     <label class="f">Senha <span class="muted" id="f-pinreg"></span><input id="f-pin" class="pin" maxlength="8" autocomplete="off" autocapitalize="off" ${novo?"required":""} placeholder="${novo?"":"carregando…"}"></label>
     <div class="wide row" style="gap:14px">${avatar(f)}<label class="f" style="flex:1">Foto (aparece na tela de entrada)<input id="f-foto" type="file" accept="image/*" ${assets?"":"disabled"}></label></div>
-    ${window.__FB?`<label class="f wide">Gmail para entrar no sistema <span class="muted">(o celular da pessoa só abre o sistema com este Gmail)</span><input id="f-em" type="email" inputmode="email" maxlength="80" autocapitalize="off" autocomplete="off" placeholder="nome@gmail.com" value="${h(f.email||"")}"></label>`:""}
+    ${window.__FB?`<label class="f wide">Gmails que abrem o sistema <span class="muted">(pode colocar mais de um, separados por vírgula · ex.: o do celular dele e o da loja · para entrar no perfil ele sempre digita a senha)</span><textarea id="f-em" rows="2" inputmode="email" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="nome@gmail.com, loja@gmail.com">${h(emailsDe(f).join(", "))}</textarea></label>`:""}
     <label class="f">Situação<select id="f-a"><option value="1">Ativo</option><option value="0" ${f.ativo===false?"selected":""}>Inativo (não entra mais)</option></select></label>
     <div class="acts wide"><button type="button" class="btn" id="f-can">Cancelar</button><button class="btn pri" type="submit">Salvar</button></div></form>`, m=>{
     $("#f-can",m).onclick=fecharModal;
@@ -6804,9 +6807,10 @@ function formFunc(f){
       if (f.dono && !ehDono()){ toast("Esse cadastro não pode ser alterado."); return; } { const sx=d.papel==="funcionario" ? [...m.querySelectorAll(".f-sx:checked")].map(x=>x.value) : []; d.setores=sx; d.setor=sx[0]||""; }
       if (!novo && f.id===me.id && (d.papel!=="chefe"||!d.ativo) && f.papel==="chefe" && S.funcionarios.filter(x=>x.papel==="chefe"&&x.ativo!==false).length<2){ toast("Precisa ficar pelo menos um chefe ativo."); return; }
       if (d.papel==="chefe" && !ehChefe() && !semChefe()){ toast("Só o chefe pode cadastrar outro chefe."); return; }
-      if (window.__FB){ d.email=String($("#f-em",m).value||"").trim().toLowerCase();
-        if (d.email && !/^[^@\s/]+@[^@\s/]+\.[^@\s/]+$/.test(d.email)){ toast("Esse Gmail não parece certo. Confira."); return; }
-        const dup = d.email && S.funcionarios.find(x=>x.id!==f.id && String(x.email||"").toLowerCase()===d.email); if (dup){ toast(`Esse Gmail já está com ${dup.nome}.`); return; } }
+      if (window.__FB){ const L=lerEmails($("#f-em",m).value).slice(0,6);
+        const ruim=L.find(e=>!/^[^@\s/]+@[^@\s/]+\.[^@\s/]+$/.test(e)); if (ruim){ toast(`Esse Gmail não parece certo: ${ruim}`); return; }
+        for (const e of L){ const dup=S.funcionarios.find(x=>x.id!==f.id && emailsDe(x).includes(e)); if (dup){ toast(`O Gmail ${e} já está com ${dup.nome}.`); return; } }
+        d.emails=L; d.email=L[0]||""; }
 
       const b=e.submitter; b.disabled=true;
       try{ const arq=$("#f-foto",m).files[0];
@@ -6815,7 +6819,9 @@ function formFunc(f){
         else { const full=Object.assign({}, f, d); delete full.id; delete full.pin; if ((trocaPin || d.papel!==f.papel) && (pinNovo||pinAtual)) full.pinH=await gravarSenha(f.id, full, pinNovo||pinAtual);
           await db.doc("funcionarios/"+f.id).set(full); auditar("Equipe", d.nome, Object.assign({}, f, {pin:"a"}), Object.assign({}, full, {pin:trocaPin?"b":"a"}));
           if (!d.ativo && f.ativo!==false) for (const x of (S.sessoes||[]).filter(y=>y.funcId===f.id && y.ativa!==false)) db.doc("sessoes/"+x.id).update({ativa:false, fim:Date.now(), motivo:"inativo", encerradaPorNome:me.nome}).catch(()=>{}); }
-        if (window.__FB) await window.__FB.liberar(String(f.email||"").toLowerCase(), d.email, d.ativo, {nome:d.nome, papel:d.papel, funcId:f.id||"", adm:d.papel==="chefe"||d.papel==="gerente"});
+        if (window.__FB){ const novos=d.emails||[], extra={nome:d.nome, papel:d.papel, funcId:f.id||"", adm:d.papel==="chefe"||d.papel==="gerente"};
+          for (const e of emailsDe(f).filter(e=>!novos.includes(e))) await window.__FB.liberar(e, "", false, {});
+          for (const e of novos) await window.__FB.liberar("", e, d.ativo, extra); }
         fecharModal(); toast("Salvo"); }catch(err){ erro(err); b.disabled=false; } };
   });
 }
