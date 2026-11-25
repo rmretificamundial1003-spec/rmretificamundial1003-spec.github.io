@@ -59,6 +59,7 @@ main .card div:has(> table){overflow-x:auto;max-width:100%}
 .tile .l{color:var(--muted);font-size:13px;font-weight:600}
 .tile.accent{border-left-color:var(--accent)} .tile.ok{border-left-color:var(--ok)} .tile.warn{border-left-color:var(--warn)} .tile.bad{border-left-color:var(--bad)} .tile.info{border-left-color:var(--info)}
 .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:7px 13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.modal .btn{white-space:normal;text-align:center;max-width:100%;flex-wrap:wrap}
 a.btn,.modal a.btn{color:var(--ink);text-decoration:none}a.btn.pri{color:var(--accent-ink)}
 .btn:hover{border-color:var(--muted)}
 .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
@@ -548,12 +549,16 @@ const ATIVAS = ["orcamento","aberta","execucao","aguardando","pronta"];
 const OFICINA = false;
 if (!OFICINA){ STATUS.aberta.t="🔧 Na oficina"; STATUS.execucao.t="🔧 Na oficina"; }
 const SO_OFICINA = ["semmec","parada","maq","carga","servsem","pecas","loj","aut","prob","imp"];
+/* PERÍODO DE TESTE: o lojista só faz NOTA DE APANHA e vê o HISTÓRICO DOS CLIENTES (sem poder mudar).
+   OS, Loja e Notas fiscais continuam no sistema antigo. Para liberar tudo de novo: LOJISTA_TESTE = false */
+const LOJISTA_TESTE = true;
+const SEM_OS = () => LOJISTA_TESTE; /* no teste não existe OS aqui: notas e clientes não falam de OS */
 const PAPEL = {chefe:"Chefe", gerente:"Gerente", lojista:"Lojista", funcionario:"Mecânico"};
 const cargo = f => !f || f.papel==="chefe" ? "" : (PAPEL[f.papel]||"");
 const VIEWS = {
   chefe:{t:"📊 Painel", r:["chefe"]},
   busca:{t:"🔎 Pesquisar OS", r:["chefe","gerente"]},
-  lojas:{t:"Minhas OS", r:["lojista"]},
+  lojas:{t:"Minhas OS", r:LOJISTA_TESTE?[]:["lojista"]},
   novaos:{t:"Nova OS", r:["chefe","gerente","lojista"], oculto:true},
   agora:{t:"Tarefas", r:["chefe","gerente"]},
   assistente:{t:"🤖 Assistente", r:["chefe"]},
@@ -563,15 +568,17 @@ const VIEWS = {
   receber:{t:"Contas a receber", r:["chefe","gerente"]},
   compras:{t:"Lista de compras", r:["chefe","gerente"]},
   estoque:{t:"Estoque", r:["chefe","gerente"]},
-  balcao:{t:"Loja", r:["chefe","gerente","lojista"]},
+  balcao:{t:"Loja", r:LOJISTA_TESTE?["chefe","gerente"]:["chefe","gerente","lojista"]},
   clientes:{t:"Clientes", r:["chefe","gerente"]},
   precos:{t:"Tabela de preços", r:["chefe","gerente"]},
   fichas:{t:"Fichas de medidas", r:["chefe","gerente"]},
   medidas:{t:"Medidas salvas", r:["chefe","gerente"]},
-  notas:{t:"Notas fiscais", r:["chefe","gerente","lojista"]},
+  notas:{t:"Notas fiscais", r:LOJISTA_TESTE?["chefe","gerente"]:["chefe","gerente","lojista"]},
   hnotas:{t:"Histórico de notas", r:["chefe"]},
   despesas:{t:"Despesas e resultado", r:["chefe"]},
   saidas:{t:"💸 Tudo que saiu", r:["chefe"]},
+  apanhas:{t:"🚗 Notas de apanha", r:["chefe","gerente","lojista"]},
+  clihist:{t:"👥 Histórico dos clientes", r:LOJISTA_TESTE?["lojista"]:[]},
   auditoria:{t:"Registros e backup", r:["chefe"]},
   historico:{t:"Histórico geral", r:["chefe"]},
   equipe:{t:"Equipe", r:["chefe","gerente"]},
@@ -584,7 +591,7 @@ const VIEWS = {
   reclamacoes:{t:"📣 Reclamações do sistema", r:["chefe","gerente"]}
 };
 if (!OFICINA){ VIEWS.os.r=["chefe","gerente"]; ["produtividade","fichas","medidas"].forEach(k=>{ VIEWS[k].r=[]; }); }
-const NAV_PRINCIPAL = OFICINA ? ["chefe","busca","agora","os","caixa","receber","clientes"] : ["chefe","busca","os","agora","estoque","caixa","receber","saidas","clientes"];
+const NAV_PRINCIPAL = OFICINA ? ["chefe","busca","agora","os","caixa","receber","clientes"] : ["chefe","busca","apanhas","os","agora","estoque","caixa","receber","saidas","clientes"];
 const NAV_GERENTE = ["agora","busca","os","caixa","notas","receber","estoque","clientes"];
 const HOLDER = "tab-" + Math.random().toString(36).slice(2);
 
@@ -653,7 +660,7 @@ function trocarMinhaSenha(obrigatorio){
       try{ const base=S.funcionarios.find(x=>x.id===me.id)||me; const pinH=await gravarSenha(me.id, base, p1); const d=Object.assign({}, base, {pinH}); delete d.id; delete d.pin; delete d.nomeReal; await db.doc("funcionarios/"+me.id).set(d); auditar("Equipe", me.nome, {pin:"x"}, {pin:"y"}); fecharModal(); toast("✅ Senha nova salva"); }catch(err){ erro(err); } };
   }, null, obrigatorio);
 }
-const S = {contagens:[], reclamacoes:[], setores:[], checklists:{}, filaCfg:{}, fichas:[], funcionarios:[], pecas:[], os:[], clientes:[], vendas:[], movimentos:[], compras:[], precos:[], caixa:[], autorizacoes:[], despesas:[], auditoria:[], acessos:[]};
+const S = {apanhas:[], contagens:[], reclamacoes:[], setores:[], checklists:{}, filaCfg:{}, fichas:[], funcionarios:[], pecas:[], os:[], clientes:[], vendas:[], movimentos:[], compras:[], precos:[], caixa:[], autorizacoes:[], despesas:[], auditoria:[], acessos:[]};
 const loaded = {};
 let me = null, view = null, osAberta = null, dbStatus = "loading";
 const UI = {osFiltro:"ativas", osBusca:"", osEscopo:null, estBusca:"", estLinha:"todas", estBaixo:false, cliBusca:"", balBusca:"", ntFiltro:"pend", carrinho:[]};
@@ -679,7 +686,7 @@ const semChefe = () => !S.funcionarios.some(f=>f.papel==="chefe" && f.ativo!==fa
 const pode = v => !!me && !!VIEWS[v] && !(v==="assistente" && window.__FB) && (VIEWS[v].r.includes(me.papel) || (v==="equipe" && me.papel==="gerente" && semChefe()));
 const ehChefe = () => !!me && me.papel==="chefe";
 const direcao = () => !!me && (me.papel==="chefe" || me.papel==="gerente");
-const inicio = p => p==="chefe" ? "chefe" : p==="gerente" ? "agora" : p==="lojista" ? "lojas" : p==="logistica" ? "leva" : "os";
+const inicio = p => p==="chefe" ? "chefe" : p==="gerente" ? "agora" : p==="lojista" ? (LOJISTA_TESTE?"apanhas":"lojas") : p==="logistica" ? "leva" : "os";
 const gerencia = () => me && (me.papel==="chefe" || me.papel==="gerente");
 function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
 const MSG_ERRO = {hist_imutavel:"O histórico não pode ser alterado nem apagado. Nada foi salvo.", travada:"Esta OS tem nota registrada: os valores estão travados. Para mudar, registre antes o cancelamento da nota.", ja_tem_nota:"Outra pessoa já registrou a nota desta OS ou venda.",
@@ -823,6 +830,7 @@ async function iniciar(){
   assinar("clientes", db.collection("clientes").orderBy("nome"));
   assinar("vendas", db.collection("vendas").orderBy("em","desc").limit(1000));
   assinar("comprasFeitas", db.collection("comprasFeitas").orderBy("em","desc").limit(1500));
+  assinar("apanhas", db.collection("apanhas").orderBy("numero","desc").limit(1000));
   assinar("banco", db.collection("banco").orderBy("data","desc").limit(4000));
   assinar("conferencias", db.collection("conferencias").limit(4000));
   assinar("movimentos", db.collection("movimentos").orderBy("em","desc").limit(1000));
@@ -947,9 +955,17 @@ async function limpezaUnicaPrecos(){ if (limpezaFeita || !me || !ehChefe()) retu
     const r=await db.collection("precos").get(); let n=0; for (const d of r.docs){ await apagarComLixeira("precos/"+d.id, Object.assign({id:d.id}, d.data())); n++; }
     await ref.set(Object.assign({}, cf.exists?cf.data():{}, {precosZerados:Date.now(), porNome:me.nome}));
     if (n) toast(`🧹 Tabela de serviços zerada (${n}). Agora é só cadastrar os seus em Tabela de preços.`); }catch(e){ limpezaFeita=false; console.error("limpeza", e); } }
+/* serviços iniciais pedidos pelo dono (entram uma vez só, depois da limpeza) */
+const PRECOS_INICIAIS = [{desc:"Serviço de cabeçote", valor:1900}, {desc:"Serviço de motor completo", valor:2900}];
+let iniFeito=false;
+async function precosIniciais(){ if (iniFeito || !me || !ehChefe()) return; iniFeito=true;
+  try{ const ref=db.doc("config/limpezas"), cf=await ref.get(); const d=cf.exists?cf.data():{}; if (!d.precosZerados || d.precosIniciais1) return;
+    const r=await db.collection("precos").get(); const tem=new Set(r.docs.map(x=>norm(x.data().desc||"")));
+    for (const p of PRECOS_INICIAIS) if (!tem.has(norm(p.desc))) await db.collection("precos").add({desc:p.desc, valor:p.valor, linha:"ambas", setor:"", criadoEm:Date.now(), atualizadoEm:Date.now(), porNome:me.nome});
+    await ref.set(Object.assign({}, d, {precosIniciais1:Date.now()})); }catch(e){ console.error("precos iniciais", e); } }
 function montar(){
   if (!me){ telaLogin(); return; }
-  setTimeout(limpezaUnicaPrecos, 2500);
+  setTimeout(()=>limpezaUnicaPrecos().then(()=>setTimeout(precosIniciais, 1500)), 2500);
   if (me.papel==="funcionario" && !OFICINA){ forcarSaida("O acesso de mecânico está desligado nesta fase do sistema."); return; }
   if (me.papel==="funcionario"){ montarFunc(); return; }
   let v = (location.hash||"").slice(1);
@@ -1449,6 +1465,7 @@ function bindOSDet(){
     if (b.id==="d-wa") menuWhats(S.os.find(x=>x.id===osAberta));
     if (b.id==="d-lib") formLiberar(S.os.find(x=>x.id===osAberta));
     if (b.id==="d-mais") maisAcoesOS(S.os.find(x=>x.id===osAberta));
+    if (b.id==="d-imp") menuImprimir(S.os.find(x=>x.id===osAberta));
   };
   $("#d-hist").onclick = e => { const im=e.target.closest("img[data-hf]"); if (im) abrirModal(`<img class="big-photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(im.dataset.hf)}" alt=""><div class="acts"><button class="btn" id="fx">Fechar</button></div>`, m=>{$("#fx",m).onclick=fecharModal;}); };
   $("#d-fotos").onclick = async e => {
@@ -1470,7 +1487,7 @@ function bindOSDet(){
       }catch(err){ erro(err); } }); };
 }
 const MOTIVOS_DESC = ["Cliente antigo / fiel","Pagamento à vista","Cliente negociou o preço","Erro ou atraso nosso","Retorno de garantia","Serviço em grande quantidade"];
-const podeServicos = o => (gerencia()||ehLojista()) && !["entregue","cancelada"].includes(o.status) && !o.notaOk;
+const podeServicos = o => (gerencia()||(ehLojista()&&!LOJISTA_TESTE)) && !["entregue","cancelada"].includes(o.status) && !o.notaOk;
 function modalServicos(o){
   const tab = precosDaLinha(o.linha), sel = new Map(); // desc -> qtd
   abrirModal(`<h2 class="fz-mh">🔧 Escolha os serviços · OS ${codOS(o)}</h2>
@@ -1604,12 +1621,13 @@ function maisAcoesOS(o){
   if (!assinaturaOS(o) && (o.aprovacoes||[]).length){ ops.push(["ass","✍️ Colher assinatura do cliente (aqui)"]); ops.push(["asz","📲 Mandar para o cliente assinar no WhatsApp"]); }
   ops.push(["laudo","📏 Laudo de medidas"]);
   if (o.status==="entregue") ops.push(["gar","🛡 Termo de garantia (imprimir)"]);
+  ops.push(["a3o","🖨 A3 · via da oficina (marcar X, sem preços)"]); ops.push(["a3c","🖨 A3 · via do cliente (comprovante de entrada)"]); ops.push(["a3", o.status==="orcamento"?"🖨 A3 · ORÇAMENTO para o cliente assinar":"🖨 A3 · OS completa com valores"]);
   ops.push(["res","📄 Copiar resumo da OS"]);
   if (direcao()&&trav) ops.push(["canc","❌ Registrar nota cancelada"]);
   abrirModal(`<h2>OS ${codOS(o)} · mais ações</h2><div class="grid" style="gap:8px">${ops.map(([k,t])=>`<button class="btn" style="justify-content:flex-start;text-align:left" data-k="${k}">${t}</button>`).join("")}</div><div class="acts"><button class="btn" id="ma-x">Fechar</button></div>`, m=>{
     $("#ma-x",m).onclick=fecharModal;
     m.onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; const k=b.dataset.k; fecharModal();
-      setTimeout(()=>{ if(k==="dev") formDevolverCorrecao(o); if(k==="corok") marcarCorrigida(o); if(k==="gar") abrirTermoGarantia(o); if(k==="ed") formOS(o); if(k==="adi") formAviso(o); if(k==="tira") tirarDoTopo(o.id); if(k==="res") imprimirOS(o); if(k==="canc") cancelarNota("OS", o.id); if(k==="laudo") verLaudo(o); if(k==="rel") abrirRelatorioCliente(o); if(k==="ass") formAssinarDepois(o); if(k==="asz") pedirAssinaturaZap(o); if(k==="etq") imprimirEtiqueta(o); if(k==="etqp") imprimirEtiquetasPecas(o);
+      setTimeout(()=>{ if(k==="a3") imprimirVia(o,"tudo"); if(k==="a3o") imprimirVia(o,"ofi"); if(k==="a3c") imprimirVia(o,"cli"); if(k==="dev") formDevolverCorrecao(o); if(k==="corok") marcarCorrigida(o); if(k==="gar") abrirTermoGarantia(o); if(k==="ed") formOS(o); if(k==="adi") formAviso(o); if(k==="tira") tirarDoTopo(o.id); if(k==="res") imprimirOS(o); if(k==="canc") cancelarNota("OS", o.id); if(k==="laudo") verLaudo(o); if(k==="rel") abrirRelatorioCliente(o); if(k==="ass") formAssinarDepois(o); if(k==="asz") pedirAssinaturaZap(o); if(k==="etq") imprimirEtiqueta(o); if(k==="etqp") imprimirEtiquetasPecas(o);
         if(k==="ent") o.entrada ? folhaParaImprimir("Ficha de entrada · OS #"+o.numero, `ficha-entrada-os-${o.numero}.html`, htmlEntradaImp(o)) : formEntrada(o); }, 150); };
   });
 }
@@ -1626,7 +1644,7 @@ function fillOSDet(){
   const prox = (TRANS[o.status]||[]).filter(podeStatus).filter(s=>!(trav && ["execucao","aguardando","cancelada"].includes(s)));
   $("#d-acts").innerHTML = prox.map(s=>`<button class="btn ${s==="pronta"||s==="entregue"||s==="aberta"||s==="execucao"?"pri":""} ${s==="cancelada"?"danger":""}" data-st="${s}">${{aberta:o.status==="orcamento"?"✅ Cliente aprovou · Lançar OS":"🔧 Voltou para a oficina",execucao:"Iniciar / retomar",aguardando:"⏸ Aguardando peça",pronta:"🏁 Marcar como pronta",entregue:"Entregar ao cliente",cancelada:"Cancelar OS",orcamento:"Reabrir como orçamento"}[s]}</button>`).join("")
     + (OFICINA && (direcao() && ["orcamento","aberta"].includes(o.status) || ehLojista() && o.status==="aberta") && !liberada(o) ? `<button class="btn pri" id="d-lib">🔧 Mandar para a oficina</button>` : "")
-    + (direcao()||ehLojista()?`<button class="btn" id="d-wa">💬 WhatsApp</button>`:"") + `<button class="btn" id="d-mais">⋯ Mais</button>`;
+    + (direcao()||ehLojista()?`<button class="btn" id="d-wa">💬 WhatsApp</button>`:"") + `<button class="btn" id="d-imp">🖨 Imprimir</button><button class="btn" id="d-mais">⋯ Mais</button>`;
   $("#d-kv").innerHTML = [["Cliente",o.cliente],["Telefone",o.telefone||"—"],["Veículo",o.veiculo||"—"],["Placa",o.placa||"—"],["Motor",o.motor||"—"],["Nº do motor",String(o.numMotor||"—").toUpperCase()],["Linha",nomeLinha(o.linha)],
     ["Aberta por",(o.criadoPorNome||fnome(o.criadoPor)||"—")+(o.criadoEm?` · ${dt(o.criadoEm)}`:"")],["Setor atual",o.setor||"—"],["Responsável",fnome(o.responsavel)],["Prioridade",o.prioridade==="urgente"?"Urgente":"Normal"],["Previsão",dia(o.previsao)+((o.prazoAlteracoes||[]).length?` (prazo alterado ${(o.prazoAlteracoes||[]).length}×)`:"")],...(me.papel!=="funcionario"&&(o.notaOk||["pronta","entregue"].includes(o.status))?[["Nota fiscal", o.notaOk?([o.nfServico&&"Serv. "+o.nfServico, o.nfPecas&&"Peças "+o.nfPecas].filter(Boolean).join(" · ")||"Sem nota"):"Pendente"]]:[]),["Aberta em",dt(o.criadoEm)]]
     .filter(([k])=>["Cliente","Telefone","Motor","Nº do motor",...(OFICINA?["Setor atual"]:[]),"Previsão","Nota fiscal","Aberta por"].includes(k)).map(([k,v])=>`<div><span>${k}</span>${h(v)}</div>`).join("")
@@ -1670,7 +1688,7 @@ function fillOSDet(){
   $("#d-alertas").innerHTML = htmlAlertasGerente(o);
   if (ehLojista() && o.status==="pronta" && !o.clienteAvisadoEm){ $("#d-gar").innerHTML = `<div class="banner" style="margin:0;display:flex;gap:10px;align-items:center;border-left:5px solid var(--ok)"><span style="flex:1">🟢 <b>O motor está pronto!</b> Avise o cliente para vir buscar.</span><button class="btn pri" id="lj-av">💬 Avisar o cliente</button></div>`; $("#lj-av").onclick=()=>menuWhats(o,"pronto"); }
   else if (ehLojista()){ $("#d-gar").innerHTML = `<div class="banner" style="margin:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-left:5px solid var(--ok)"><span style="flex:1"><b>OS ${codOS(o)}</b> · ${h(etapaAtual(o))} · Total: <b>${money(totalOS(o))}</b></span><button class="btn pri" id="lj-ok">✔ Pronto, voltar</button></div>`; $("#lj-ok").onclick=()=>{ osAberta=null; if (location.hash!=="#lojas") location.hash="lojas"; montar(); };
-    $("#d-ent").innerHTML = htmlEntradaCard(o); $("#d-ent").onclick=e=>{ const b=e.target.closest("[data-en]"); if(!b) return; if (b.dataset.en==="ass"){ formAssinarDepois(o); return; } if (b.dataset.en==="asz"){ pedirAssinaturaZap(o); return; } if (b.dataset.en==="apr"){ formAprovacao(o, "aberta"); return; } if (b.dataset.en==="rel"){ abrirRelatorioCliente(o); return; } if (b.dataset.en==="ed") formEntrada(o); else folhaParaImprimir("Ficha de entrada · OS #"+o.numero, `ficha-entrada-os-${o.numero}.html`, htmlEntradaImp(o)); };
+    $("#d-ent").innerHTML = htmlApanhaCard(o) + htmlEntradaCard(o); $("#d-ent").onclick=e=>{ const b=e.target.closest("[data-en]"); if(!b) return; if (b.dataset.en==="ass"){ formAssinarDepois(o); return; } if (b.dataset.en==="asz"){ pedirAssinaturaZap(o); return; } if (b.dataset.en==="apr"){ formAprovacao(o, "aberta"); return; } if (b.dataset.en==="rel"){ abrirRelatorioCliente(o); return; } if (b.dataset.en==="ed") formEntrada(o); else folhaParaImprimir("Ficha de entrada · OS #"+o.numero, `ficha-entrada-os-${o.numero}.html`, htmlEntradaImp(o)); };
     if (UI.entradaPendente===o.id){ UI.entradaPendente=null; setTimeout(()=>formEntrada(o), 300); } }
   if (direcao()){
     if (false){ $("#d-alertas").insertAdjacentHTML("afterbegin", `<div class="banner" style="margin:0;border-left:5px solid var(--accent);display:flex;gap:10px;align-items:center"><span style="flex:1">📥 OS enviada pelo lojista <b>${h(fnome(o.criadoPor))}</b> em ${dt(o.criadoEm)}.</span><button class="btn sm pri" id="b-receb">Marcar como recebida</button></div>`); $("#b-receb").onclick=()=>marcarRecebida(o.id); }
@@ -1680,7 +1698,7 @@ function fillOSDet(){
     const apo = autPendentes().filter(a=>a.osId===o.id);
     $("#d-gar").innerHTML = (apo.length?`<div class="banner warn" style="margin:0 0 8px">🔐 Esperando o chefe autorizar: ${apo.map(a=>h(a.descricao)).join(" · ")}${ehChefe()?` · <a href="#agora">ver pedidos</a>`:""}</div>`:"") + (g ? `<div class="banner warn" style="margin:0">🛡 <b>Retorno de garantia</b> da <a href="#" data-gos="${g.id}">OS ${codOS(g)}</a> (entregue em ${dt(g.entregueEm)}, garantia até ${dia(g.garantiaAte)}).</div>` : "");
     $("#d-gar").onclick=e=>{ const a=e.target.closest("[data-gos]"); if(a){ e.preventDefault(); abrirOS(a.dataset.gos); } };
-    $("#d-ent").innerHTML = htmlEntradaCard(o);
+    $("#d-ent").innerHTML = htmlApanhaCard(o) + htmlEntradaCard(o);
     $("#d-ent").onclick=e=>{ const b=e.target.closest("[data-en]"); if(!b) return; if (b.dataset.en==="ass"){ formAssinarDepois(o); return; } if (b.dataset.en==="asz"){ pedirAssinaturaZap(o); return; } if (b.dataset.en==="apr"){ formAprovacao(o, "aberta"); return; } if (b.dataset.en==="rel"){ abrirRelatorioCliente(o); return; } if (b.dataset.en==="ed") formEntrada(o); else folhaParaImprimir("Ficha de entrada · OS #"+o.numero, `ficha-entrada-os-${o.numero}.html`, htmlEntradaImp(o)); };
     if (UI.entradaPendente===o.id){ UI.entradaPendente=null; setTimeout(()=>formEntrada(o), 300); }
   }
@@ -1695,7 +1713,7 @@ function fillOSDet(){
   $("#d-chk").innerHTML = htmlChecklistGerente(o);
   const bl=$("#d-laudo"); if (bl) bl.onclick=()=>verLaudo(o);
   verificarHist(o).then(r=>{ const el=$("#d-selo"); if(!el) return; el.innerHTML = !r.ok ? `<span class="chip-low">⚠️ Histórico alterado fora do sistema</span>` : r.semSelo ? `<span class="muted">🔒 Selado a partir da próxima ação (${r.semSelo} registro${r.semSelo>1?"s":""} antigo${r.semSelo>1?"s":""})</span>` : `<span style="color:var(--ok)">🔒 Histórico íntegro · ${r.n} registros</span>`; });
-  $("#d-hist").innerHTML = histComAss(o).slice().reverse().map(x=>x.__ass ? `<li style="background:var(--ok-bg);border-radius:8px"><div class="t num">${dt(x.em)}<br>${h(x.__ass.nome)}</div><div><b style="color:var(--ok)">✍️ Rubrica do cliente</b>${x.__ass.remota?` <span class="muted" style="font-size:12px">· pelo link do WhatsApp</span>`:x.__ass.colhidaPorNome?` <span class="muted" style="font-size:12px">· colhida por ${h(x.__ass.colhidaPorNome)}</span>`:""}<br>${imgAss(o, x.__ass, 70)}<br><span class="muted" style="font-size:12px">${h(x.__ass.nome)}${x.__ass.doc?" · "+h(x.__ass.doc):""}${x.__ass.valor!=null?" · "+money(x.__ass.valor):""} · toque na rubrica para ampliar</span></div></li>` : `<li><div class="t num">${dt(x.em)}<br>${h(x.porNome)}</div><div style="white-space:pre-wrap">${h(x.txt)}${x.foto?`<br><img class="hist-foto" data-hf="${h(x.foto)}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(x.foto)}" alt="Foto" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'muted',textContent:'(foto indisponível)'}))">`:""}</div></li>`).join("") || `<li class="muted">Sem registros.</li>`;
+  $("#d-hist").innerHTML = histComAss(o).slice().reverse().map(x=>x.__ass ? `<li style="background:var(--ok-bg);border-radius:8px"><div class="t num">${dt(x.em)}<br>${h(x.__ass.nome)}</div><div><b style="color:var(--ok)">✍️ ${x.__rot?h(x.__rot):"Rubrica do cliente"}</b>${x.__ass.remota?` <span class="muted" style="font-size:12px">· pelo link do WhatsApp</span>`:x.__ass.colhidaPorNome?` <span class="muted" style="font-size:12px">· colhida por ${h(x.__ass.colhidaPorNome)}</span>`:""}<br>${imgAss(o, x.__ass, 70)}<br><span class="muted" style="font-size:12px">${h(x.__ass.nome)}${x.__ass.doc?" · "+h(x.__ass.doc):""}${x.__ass.valor!=null?" · "+money(x.__ass.valor):""} · toque na rubrica para ampliar</span></div></li>` : `<li><div class="t num">${dt(x.em)}<br>${h(x.porNome)}</div><div style="white-space:pre-wrap">${h(x.txt)}${x.foto?`<br><img class="hist-foto" data-hf="${h(x.foto)}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(x.foto)}" alt="Foto" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'muted',textContent:'(foto indisponível)'}))">`:""}</div></li>`).join("") || `<li class="muted">Sem registros.</li>`;
 }
 async function mudarStatus(st){
   const o = S.os.find(x=>x.id===osAberta);
@@ -2280,11 +2298,11 @@ function formCarro(c, depois){ if (!c) return;
   abrirModal(`<h2>🚗 Cadastrar o carro de ${h(c.nome)}</h2><p class="muted" style="margin:0 0 8px">Fica salvo no cliente. Na próxima OS é só tocar no carro que já preenche tudo.</p>
     <form id="fcar" class="form"><label class="f meia">Carro / veículo *<input id="cr-v" list="dl-vei2" autocomplete="off" placeholder="Ex.: Gol 1.6, Kwid, Atego"><datalist id="dl-vei2">${veicTodos().map(v=>`<option value="${h(v[0]+" "+v[1])}">`).join("")}</datalist></label>
     <label class="f">Placa<input id="cr-p" placeholder="ABC1D23" style="text-transform:uppercase"></label><label class="f">Ano<input id="cr-a" inputmode="numeric" maxlength="4"></label>
-    <label class="f meia">Motor<input id="cr-m" placeholder="Ex.: AP 1.6, SCe 1.0"></label><label class="f meia">Nº do motor (no bloco)<input id="cr-n" style="text-transform:uppercase"></label>
+    <label class="f meia">Motor<input id="cr-m" placeholder="Ex.: AP 1.6, SCe 1.0"></label><label class="f wide">🔋 Bateria (marca, modelo e dados)<input id="cr-n" placeholder="Ex.: Moura M60GD · 60Ah · 12V"></label>
     <div class="acts wide"><button type="button" class="btn" id="cr-x">${depois?"Voltar":"Pular (cadastro depois)"}</button><button class="btn pri" type="submit">💾 Salvar carro</button></div></form>`, m=>{
     $("#cr-v",m).focus(); $("#cr-x",m).onclick=()=>{ fecharModal(); if (depois) depois(null); };
     $("#cr-v",m).addEventListener("input", ()=>{ const v=veicAchar($("#cr-v",m).value); if (v && v[3] && v[3].length===1 && !$("#cr-m",m).value) $("#cr-m",m).value=v[3][0]; });
-    $("#fcar",m).onsubmit=async e=>{ e.preventDefault(); const car={veiculo:$("#cr-v",m).value.trim(), placa:$("#cr-p",m).value.trim().toUpperCase(), ano:$("#cr-a",m).value.trim(), motor:$("#cr-m",m).value.trim(), numMotor:$("#cr-n",m).value.trim().toUpperCase(), em:Date.now()};
+    $("#fcar",m).onsubmit=async e=>{ e.preventDefault(); const car={veiculo:$("#cr-v",m).value.trim(), placa:$("#cr-p",m).value.trim().toUpperCase(), ano:$("#cr-a",m).value.trim(), motor:$("#cr-m",m).value.trim(), bateria:$("#cr-n",m).value.trim(), em:Date.now()};
       if (!car.veiculo){ toast("Escreva qual é o carro."); return; }
       try{ await salvarCarro(c, car); fecharModal(); toast("🚗 Carro salvo"); if (depois) depois(car); }catch(err){ erro(err); } };
   }); }
@@ -3377,6 +3395,303 @@ function htmlPagGar(o){
 }
 
 /* ---- ficha de entrada do motor ---- */
+/* ===== NOTA DE APANHA: vistoria do carro fechado na entrada (antes da desmontagem) ===== */
+const APANHA_ITENS = ["Retrovisor elétrico","Retrovisor comum","Frisos laterais","Farol de milha","Farol de neblina","Rodas liga/espec.","Rodas de aço","Calotas","Chave de ignição","Cx. marcha c/ vazamento",
+  "Chave codificada","Rádio","Rádio toca-fitas","Rádio CD player","Rádio transmissor","Disqueteria","Caixa selada","Painel digital","Motor c/ barulho","Cx. marcha c/ barulho",
+  "Painel analógico","Acendedor cigarro","Alto-falantes","Amplificador","Antena elétrica","Antena comum","Antena interna","Console","Tapete","Motor baixando óleo",
+  "Tampão traseiro","Buzina ar/elétrica","Banco dianteiro dir.","Banco dianteiro esq.","Banco traseiro","Alarme","Extintor","Estepe","Triângulo",
+  "Macaco","Chave de rodas","Protetor cárter","Suspensão","Ar-condicionado","Freios","Sistema elétrico","Embreagem","Sistema injeção"];
+const APANHA_AVARIAS = ["Para-choque dianteiro","Capô","Para-brisa","Teto","Para-lama diant. esq.","Para-lama diant. dir.","Porta diant. esq.","Porta diant. dir.","Porta tras. esq.","Porta tras. dir.","Lateral tras. esq.","Lateral tras. dir.","Tampa traseira","Para-choque traseiro","Vidros","Faróis / lanternas","Retrovisores","Rodas / pneus"];
+const APANHA_COMB = ["R","1/4","1/2","3/4","C"];
+const apanhaNova = () => ({km:"", cor:"", ano:"", chassi:"", bateria:"", comb:"", pneus:"", itens:{}, avarias:[], compl:"", obs:""});
+function faltaApanha(a){ const f=[]; if (!a) return ["nota de apanha"]; if (!String(a.km||"").trim()) f.push("KM"); if (!a.comb) f.push("combustível"); if (!a.pneus) f.push("pneus");
+  const sem=APANHA_ITENS.filter(x=>!(a.itens||{})[x]).length; if (sem) f.push(`${sem} itens da vistoria sem S/N/A`); return f; }
+function htmlApanha(a, px){ const sn=(x)=>{ const v=(a.itens||{})[x]||""; return `<div class="ap-it"><span>${h(x)}</span><span class="ap-b" data-it="${h(x)}">${["S","N","A"].map(k=>`<button type="button" data-v="${k}" class="${v===k?"on ap-"+k:""}">${k}</button>`).join("")}</span></div>`; };
+  return `<style>.ap-it{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);break-inside:avoid}.ap-it>span:first-child{font-size:14px}.ap-b{display:flex;gap:4px;flex-shrink:0}.ap-b button{width:38px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font-weight:800;font-size:15px;cursor:pointer}.ap-b button.ap-S{background:#16a34a;color:#fff;border-color:#16a34a}.ap-b button.ap-N{background:#6b7280;color:#fff;border-color:#6b7280}.ap-b button.ap-A{background:#dc2626;color:#fff;border-color:#dc2626}.ap-grid{columns:2 300px;column-gap:24px}</style>
+  <div class="form os" style="margin-top:8px"><label class="f">KM *<input id="${px}-km" inputmode="numeric" value="${h(a.km)}" placeholder="Ex.: 125430"></label><label class="f">Cor<input id="${px}-cor" value="${h(a.cor)}"></label><label class="f">Ano<input id="${px}-ano" inputmode="numeric" maxlength="4" value="${h(a.ano)}"></label><label class="f">Chassi<input id="${px}-chs" value="${h(a.chassi)}" style="text-transform:uppercase"></label><label class="f wide">🔋 Bateria (marca, modelo e dados)<input id="${px}-bat" value="${h(a.bateria||"")}" placeholder="Ex.: Moura M60GD · 60Ah · 12V · 500A"></label></div>
+  <div class="row" style="gap:18px;flex-wrap:wrap;margin-top:8px"><div><b>⛽ Combustível *</b><div class="seg" id="${px}-comb" style="margin-top:4px">${APANHA_COMB.map(k=>`<button type="button" data-k="${k}" class="${a.comb===k?"on":""}">${k}</button>`).join("")}</div></div>
+    <div><b>🛞 Pneus *</b><div class="seg" id="${px}-pn" style="margin-top:4px">${["Novos","Bons","Ruins"].map(k=>`<button type="button" data-k="${k}" class="${a.pneus===k?"on":""}">${k}</button>`).join("")}</div></div></div>
+  <div style="margin-top:12px" class="row"><b style="flex:1">🔍 Acessórios e estado · <span style="color:#16a34a">S</span> tem · <span class="muted">N</span> não tem · <span style="color:#dc2626">A</span> avariado/incompleto *</b><button type="button" class="btn sm" id="${px}-tudoS">Marcar o resto como S</button></div>
+  <div class="ap-grid" id="${px}-itens" style="margin-top:6px">${APANHA_ITENS.map(sn).join("")}</div><div id="${px}-cont" class="muted" style="font-size:13px;margin-top:4px"></div>
+  <div style="margin-top:12px"><b>🚗 Avarias na lataria</b> <span class="muted" style="font-size:13px">(toque onde tem risco, amassado ou quebra · tire foto também)</span><div class="row" id="${px}-av" style="gap:6px;flex-wrap:wrap;margin-top:6px">${APANHA_AVARIAS.map(x=>`<button type="button" class="chip ${(a.avarias||[]).includes(x)?"on":""}" data-av="${h(x)}">${h(x)}</button>`).join("")}</div></div>
+  <label class="f" style="margin-top:10px">Serviços complementares / como o carro chegou<input id="${px}-cp" value="${h(a.compl)}" placeholder="Ex.: veio de reboque, ar-condicionado não funciona"></label>
+  <label class="f" style="margin-top:6px">Observações<input id="${px}-ob" value="${h(a.obs)}"></label>`; }
+function ligarApanha(m, px, a, mudou){ const ch=()=>{ const c=$("#"+px+"-cont",m); if (c){ const sem=APANHA_ITENS.filter(x=>!a.itens[x]).length, av=APANHA_ITENS.filter(x=>a.itens[x]==="A").length; c.textContent = sem ? `Faltam ${sem} itens` : `✔ Vistoria completa${av?` · ${av} avariado(s)`:""}`; } if (mudou) mudou(); };
+  const bind=(id,k,up)=>{ const i=$("#"+px+"-"+id,m); if (i) i.addEventListener("input", ()=>{ a[k]=up?i.value.toUpperCase():i.value; ch(); }); };
+  bind("km","km"); bind("cor","cor"); bind("ano","ano"); bind("chs","chassi",true); bind("bat","bateria"); bind("cp","compl"); bind("ob","obs");
+  const seg=(id,k)=>{ $("#"+px+"-"+id,m).onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; a[k]=b.dataset.k; $("#"+px+"-"+id,m).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); ch(); }; }; seg("comb","comb"); seg("pn","pneus");
+  $("#"+px+"-itens",m).onclick=e=>{ const b=e.target.closest("[data-v]"); if(!b) return; const g=b.parentElement, it=g.dataset.it, v=b.dataset.v; a.itens[it] = a.itens[it]===v ? "" : v; g.querySelectorAll("button").forEach(x=>{ const on=x.dataset.v===a.itens[it]; x.className = on ? "on ap-"+x.dataset.v : ""; }); ch(); };
+  $("#"+px+"-tudoS",m).onclick=()=>{ APANHA_ITENS.forEach(x=>{ if (!a.itens[x]) a.itens[x]="S"; }); m.querySelectorAll(`#${px}-itens .ap-b`).forEach(g=>g.querySelectorAll("button").forEach(x=>{ const on=x.dataset.v===a.itens[g.dataset.it]; x.className = on ? "on ap-"+x.dataset.v : ""; })); ch(); };
+  $("#"+px+"-av",m).onclick=e=>{ const b=e.target.closest("[data-av]"); if(!b) return; const k=b.dataset.av; a.avarias = a.avarias.includes(k) ? a.avarias.filter(x=>x!==k) : a.avarias.concat([k]); b.classList.toggle("on"); ch(); };
+  ch(); }
+function formApanha(o){ const a=Object.assign(apanhaNova(), JSON.parse(JSON.stringify(o.apanha||{}))); a.itens=a.itens||{}; a.avarias=a.avarias||[];
+  abrirModal(`<h2>🚗 Nota de apanha · OS ${codOS(o)}</h2><p class="muted" style="margin:0">Vistoria do carro fechado, na entrada, antes da desmontagem.</p>${htmlApanha(a,"ap")}
+    <div class="acts"><button class="btn" id="ap-x">Cancelar</button><button class="btn pri" id="ap-ok">💾 Salvar vistoria</button></div>`, m=>{ ligarApanha(m,"ap",a); $("#ap-x",m).onclick=fecharModal;
+    $("#ap-ok",m).onclick=async()=>{ const f=faltaApanha(a); if (f.length){ toast("Falta: "+f.join(", ")); return; } try{ await patchOS(o.id, d=>{ const ja=!!d.apanha; d.apanha=Object.assign({}, a, {em:(d.apanha&&d.apanha.em)||Date.now(), por:me.id, porNome:me.nome, editadoEm:ja?Date.now():null}); d.carroFechado=true; addHist(d, (ja?"✏️ ALTERADA · ":"")+textoApanha(a, me.nome)); }); fecharModal(); toast("✅ Vistoria salva"); }catch(err){ erro(err); } }; }); }
+function htmlApanhaCard(o){ const a=o.apanha; if (!a && !o.carroFechado) return "";
+  if (o.apanhaId){ const na=S.apanhas.find(x=>x.id===o.apanhaId); const av=a?APANHA_ITENS.filter(x=>(a.itens||{})[x]==="A"):[];
+    return `<div class="card" style="padding:10px 14px"><div class="row"><b style="flex:1">🚗 Veio da Nota de apanha ${h(na?codNA(na):("NA-"+String(o.apanhaNum||"").padStart(4,"0")))}</b>${na?`<button type="button" class="btn sm" data-vna="${na.id}">Ver a nota</button>`:""}</div>
+      ${a?`<div style="font-size:14px;margin-top:4px">KM <b>${h(a.km)}</b> · ⛽ <b>${h(a.comb)}</b> · 🛞 <b>${h(a.pneus)}</b> · recebido por ${h(a.porNome||"")} ${dt(a.em)}</div>${av.length?`<div style="font-size:14px;color:var(--bad)">⚠️ Avariado: ${h(av.join(", "))}</div>`:""}${(a.avarias||[]).length?`<div style="font-size:14px;color:var(--bad)">🚗 Lataria: ${h(a.avarias.join(", "))}</div>`:""}`:""}</div>`; }
+  if (!a) return `<div class="card" style="padding:10px 14px;border-color:var(--warn)"><b style="color:var(--warn)">🚗 Falta a nota de apanha</b> <span class="muted">(carro fechado)</span> <button type="button" class="btn sm pri" data-ap="1" style="margin-left:8px">Fazer a vistoria</button></div>`;
+  const av=APANHA_ITENS.filter(x=>a.itens[x]==="A"), nao=APANHA_ITENS.filter(x=>a.itens[x]==="N");
+  return `<div class="card" style="padding:10px 14px"><div class="row"><b style="flex:1">🚗 Nota de apanha</b><button type="button" class="btn sm" data-ap="1">Ver / editar</button></div>
+    <div style="font-size:14px;margin-top:4px">KM <b>${h(a.km)}</b> · ⛽ <b>${h(a.comb)}</b> · 🛞 pneus <b>${h(a.pneus)}</b>${a.cor?` · ${h(a.cor)}`:""}${a.ano?` · ${h(a.ano)}`:""} · recebido por ${h(a.porNome||"")} ${dt(a.em)}</div>
+    ${av.length?`<div style="font-size:14px;color:var(--bad)">⚠️ Avariado: ${h(av.join(", "))}</div>`:""}${(a.avarias||[]).length?`<div style="font-size:14px;color:var(--bad)">🚗 Lataria: ${h(a.avarias.join(", "))}</div>`:""}
+    ${nao.length?`<div class="muted" style="font-size:13px">Não tem: ${h(nao.join(", "))}</div>`:""}${a.compl?`<div style="font-size:14px">📝 ${h(a.compl)}</div>`:""}</div>`; }
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-vna]"); if (!b) return; const a=S.apanhas.find(x=>x.id===b.dataset.vna); if (a) verNotaApanha(a); });
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-ap]"); if (!b) return; const o=S.os.find(x=>x.id===osAberta); if (o) formApanha(o); });
+function htmlApanhaImp(a){ if (!a) return ""; const mk=x=>{ const v=a.itens[x]||""; return `<td style="width:26px;text-align:center;font-weight:900">${v==="S"?"X":""}</td><td style="width:26px;text-align:center;font-weight:900">${v==="N"?"X":""}</td><td style="width:26px;text-align:center;font-weight:900;color:#c00">${v==="A"?"X":""}</td>`; };
+  const per=Math.ceil(APANHA_ITENS.length/3), cols=[0,1,2].map(i=>APANHA_ITENS.slice(i*per,(i+1)*per));
+  return `<div class="g g4"><div><b>KM</b>${h(a.km||"")}</div><div><b>Cor</b>${h(a.cor||"—")}</div><div><b>Ano</b>${h(a.ano||"—")}</div><div><b>Chassi</b>${h(a.chassi||"—")}</div><div style="grid-column:1/-1"><b>🔋 Bateria</b>${h(a.bateria||"—")}</div></div>
+  <div style="display:flex;gap:30px;margin:8px 0;font-size:17px"><span><b>⛽ Combustível:</b> ${APANHA_COMB.map(k=>`<span class="bx" style="width:auto;padding:0 4px">${a.comb===k?"■ ":""}${k}</span>`).join(" ")}</span><span><b>🛞 Pneus:</b> ${["Novos","Bons","Ruins"].map(k=>`<span class="bx">${a.pneus===k?"X":""}</span>${k}`).join(" &nbsp; ")}</span></div>
+  <div style="font-size:13px;margin-bottom:4px"><b>S</b> = sim, existente · <b>N</b> = não existente · <b>A</b> = avariado ou incompleto</div>
+  <style>.apt td{height:22px !important;padding:0 6px}</style><div style="display:flex;gap:10px">${cols.map(c=>`<table class="apt" style="font-size:13px"><tr><th>Item</th><th>S</th><th>N</th><th>A</th></tr>${c.map(x=>`<tr><td style="height:19px;padding:0 6px">${h(x)}</td>${mk(x)}</tr>`).join("")}</table>`).join("")}</div>
+  <p style="font-size:16px;margin:8px 0 0"><b>Avarias na lataria:</b> ${h((a.avarias||[]).join(", ")||"nenhuma marcada")}</p>${a.compl?`<p style="font-size:16px;margin:4px 0 0"><b>Serviços complementares / como chegou:</b> ${h(a.compl)}</p>`:""}${a.obs?`<p style="font-size:16px;margin:4px 0 0"><b>Observações:</b> ${h(a.obs)}</p>`:""}`; }
+/* texto completo da nota de apanha para o histórico (tudo que foi marcado) */
+const codNA = a => a ? "NA-"+String(a.numero).padStart(4,"0") : "";
+async function proxNumeroApanha(){ let n=0; await comTrava("config/contadorApanha", async ref=>{ const sn=await ref.get(); const ult=sn.exists?Number(sn.data().ultimo)||0:0; n=Math.max(ult, ...S.apanhas.map(a=>Number(a.numero)||0))+1; await ref.set({ultimo:n, em:Date.now(), porNome:me.nome}); }); return n; }
+/* serviço que o cliente autoriza na entrada (os valores vêm da tabela; se não tiver, usa os combinados) */
+const servIniOpcoes = linha => (typeof PRECOS_INICIAIS!=="undefined"?PRECOS_INICIAIS:[]).map(p=>{ const t=precosDaLinha(linha||"leve").find(x=>norm(x.desc)===norm(p.desc)); return {desc:p.desc, valor:t?Number(t.valor):p.valor}; });
+const desmTabela = linha => { const p=precosDaLinha(linha||"leve").find(x=>/desmont|avalia/i.test(x.desc)); return p?Number(p.valor):null; };
+const termoDesmontagem = (veic, valor, serv) => `Autorizo a ${nomeEmp()} a fazer o ${String(serv||"serviço").toLowerCase()} do veículo ${veic||""}, no valor de ${money(valor||0)}. Peças e serviços a mais que forem encontrados na desmontagem serão informados no orçamento, para a minha aprovação antes de serem feitos.`;
+function novaNotaApanha(clienteId){ UI.nv = nvNovo("motor"); UI.nv.modoApanha=true; UI.nv.carro=true; if (clienteId) UI.nv.cliId=clienteId; location.hash="#novaos"; }
+async function salvarNotaApanha(){ const n=UI.nv, b=$("#nv-salvar");
+  { const cl=nvCli()||n.novo||{}; const dn=$("#as-n"), dd=$("#as-d"); if (dn && !dn.value.trim() && cl.nome) dn.value=cl.nome; if (dd && !dd.value.trim() && cl.doc) dd.value=fmtDoc(cl.doc); }
+  const la = UI.nvAss ? UI.nvAss.ler() : {ok:true, ass:null}; if (!la.ok) return; const veicTxt=[n.veiculo, n.placa].filter(Boolean).join(" ");
+  if (la.ass) la.ass.termo = termoDesmontagem(veicTxt, n.desmVal, n.servIni);
+  b.disabled=true; b.textContent="Salvando…";
+  try{ let c=nvCli(); if (!c) c=await nvSalvarCliente(true); if (!c) throw {code:"sem_cliente"};
+    const agora=Date.now(), numero=await proxNumeroApanha();
+    const d={numero, cliente:c.nome, clienteId:c.id, telefone:c.telefone||"", veiculo:n.veiculo.trim(), placa:n.placa.trim().toUpperCase(), motor:n.motor.trim(), numMotor:n.numMotor.trim(), linha:n.linha,
+      servicosSolicitados:n.problema.trim(), vistoria:JSON.parse(JSON.stringify(n.apanha)), fotos:[], em:agora, por:me.id, porNome:me.nome, osId:"", osNum:"",
+      servicoAutorizado:n.servIni||"", desmontagem:Number(n.desmVal)||0, termoDesmontagem:termoDesmontagem(veicTxt, n.desmVal, n.servIni), assinatura:la.ass||null, assinaComo:n.apComo||"papel",
+      hist:[{em:agora, porNome:me.nome, txt:textoApanha(n.apanha, me.nome)}, {em:agora+1, porNome:me.nome, txt: la.ass ? `✍️ ${la.ass.nome} (${la.ass.doc}) assinou na tela autorizando ${n.servIni} · ${money(n.desmVal)}` : `✍️ Serviço autorizado na entrada: ${n.servIni} · ${money(n.desmVal)} (${(n.apComo||"papel")==="link"?"cliente não estava na loja: vai assinar pelo link no WhatsApp":"assinatura do cliente no papel"})`}]};
+    if (n.fotos.length && assets){ b.textContent="Enviando fotos…";
+      for (const f of n.fotos){ try{ const blob = f.file.type==="image/gif" ? f.file : await comprimir(f.file); const r=await assets.upload(blob, {type:blob.type||"image/jpeg"}); const em=Date.now();
+        d.fotos.push({id:r.id, em, por:me.id, porNome:me.nome, etapa:"Nota de apanha"}); d.hist.push({em, porNome:me.nome, txt:"📷 Foto do carro na chegada", foto:r.id}); }catch(err){ toast("Uma foto não foi enviada. Coloque de novo em ✏️ Corrigir a vistoria."); } } }
+    const ref=await db.collection("apanhas").add(d); d.id=ref.id;
+    salvarCarro(S.clientes.find(x=>x.id===c.id)||c, {veiculo:d.veiculo, placa:d.placa, ano:n.apanha.ano, motor:d.motor, bateria:n.apanha.bateria||"", em:agora}).catch(()=>{});
+    UI.nv=null; location.hash="#apanhas"; setTimeout(()=>notaApanhaSucesso(d, c), 300);
+  }catch(err){ b.disabled=false; b.textContent="🚗 Salvar nota de apanha"; erro(err); } }
+function notaApanhaSucesso(a, c){ const wa=foneWa((c||{}).telefone||a.telefone);
+  const msg=`Olá, ${String(a.cliente||"").split(" ")[0]}! Aqui é ${me.nome}, da ${nomeEmp()}.\nRecebemos o seu ${a.veiculo||"veículo"}${a.placa?` (placa ${a.placa})`:""} · Nota de apanha ${codNA(a)}.\n\nVamos avaliar e mandamos o orçamento por aqui para você aprovar. 👍`;
+  abrirModal(`<h2 style="color:var(--ok)">🚗 Nota de apanha ${codNA(a)} salva</h2><p class="muted" style="margin:0 0 10px">${h(a.cliente)} · ${h(a.veiculo)} ${h(a.placa||"")}</p>
+    <div style="display:grid;gap:8px"><button class="btn" id="ns-pdf" style="justify-content:center;min-height:60px;font-size:17px;background:#1fa855;border-color:#1fa855;color:#fff">📲 Enviar a nota em PDF${a.assinaComo==="link"&&ponteUrl()?" + link para assinar":""} pelo WhatsApp</button>
+    <div class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn pri" id="ns-imp" style="flex:1;min-width:0;justify-content:center;min-height:56px">🖨 Via do cliente<br><small>(A3)</small></button><button class="btn pri" id="ns-ofi" style="flex:1;min-width:0;justify-content:center;min-height:56px">🖨 Via da oficina<br><small>(marcar X · A3)</small></button></div>
+    ${wa?`<a class="btn" style="justify-content:center;min-height:44px" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}">💬 Só a mensagem (sem PDF)</a>`:""}
+    ${podeAbrirOS()&&!SEM_OS()?`<button class="btn" id="ns-os" style="justify-content:center;min-height:48px">🔧 Abrir a OS agora (se já sabe o serviço)</button>`:""}
+    <button class="btn" id="ns-ok" style="justify-content:center">Fechar</button></div>`, m=>{ $("#ns-ok",m).onclick=fecharModal; $("#ns-imp",m).onclick=()=>{ fecharModal(); imprimirNotaApanha(a); }; $("#ns-ofi",m).onclick=()=>{ fecharModal(); imprimirOficinaNota(a); }; $("#ns-pdf",m).onclick=()=>enviarPdfNota(a, a.assinaComo==="link"); if ($("#ns-os",m)) $("#ns-os",m).onclick=()=>{ fecharModal(); abrirOSdaNota(a); }; }); }
+function abrirOSdaNota(a){ if (!podeAbrirOS()){ toast("Neste período de teste, isso fica na Softcom."); return; } if (a.osId){ toast("Esta nota já virou a OS "+(a.osNum?("M-"+a.osNum):"")); return; } UI.nv=nvNovo("motor"); const n=UI.nv; n.cliId=a.clienteId; n.carro=true; n.apanhaId=a.id; n.veiculo=a.veiculo||""; n.placa=a.placa||""; n.motor=a.motor||""; n.numMotor=a.numMotor||""; n.linha=a.linha||"leve"; n.problema=a.servicosSolicitados||""; if (a.servicoAutorizado){ const t=precosDaLinha(n.linha).find(x=>norm(x.desc)===norm(a.servicoAutorizado)); if (t) n.servs.set(t.desc,1); } location.hash="#novaos"; }
+function nvRenderApSel(){ const n=UI.nv, w=$("#nv-apsel"); if (!n||!w) return; const c=nvCli();
+  const L=S.apanhas.filter(a=>!a.osId && (!c || a.clienteId===c.id));
+  w.innerHTML = `<div class="banner" style="margin:0 0 8px">🚗 O carro chegou fechado: a vistoria fica na <b>Nota de apanha</b>, que é separada da OS. Escolha a nota deste carro${c?"":" (escolha o cliente primeiro)"}.</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap">${L.map(a=>`<button type="button" class="chip ${n.apanhaId===a.id?"on":""}" data-nap="${a.id}">${codNA(a)} · ${h(a.veiculo||"")} ${h(a.placa||"")} · ${dia(isoDia(a.em))}</button>`).join("") || `<span class="muted">Nenhuma nota de apanha aberta${c?" para este cliente":""}.</span>`}
+    <button type="button" class="btn sm" id="nv-apnova">＋ Fazer a nota de apanha agora</button></div>`;
+  w.onclick=e=>{ const b=e.target.closest("[data-nap]"); if (b){ const a=S.apanhas.find(x=>x.id===b.dataset.nap); n.apanhaId = n.apanhaId===a.id ? "" : a.id; if (n.apanhaId){ ["veiculo","placa","motor","numMotor"].forEach(k=>{ if (!n[k] && a[k]) n[k]=a[k]; }); if (!n.problema && a.servicosSolicitados) n.problema=a.servicosSolicitados; nvPreencheCarro({veiculo:n.veiculo, placa:n.placa, motor:n.motor, numMotor:n.numMotor}); const pr=$("#nv-pro"); if (pr && !pr.value) pr.value=n.problema; } nvRenderApSel(); nvAtualiza(); return; }
+    if (e.target.closest("#nv-apnova")) novaNotaApanha(c?c.id:null); }; }
+/* ===== PDF FEITO NO PRÓPRIO SISTEMA (sem internet, sem programa extra) ===== */
+const PDF_TROCA = {"–":"-","—":"-","•":"-","·":"-","’":"'","‘":"'","“":'"',"”":'"',"…":"...","✓":"v","✔":"v","→":"->"};
+const pdfTxt = s => String(s==null?"":s).replace(/[^\x00-\xFF]/g, c=>PDF_TROCA[c]!=null?PDF_TROCA[c]:"").replace(/[\x00-\x08\x0B-\x1F]/g,"");
+function pdfNovo(){ const W=595.28, H=841.89, M=34, pages=[], imgs=[]; let cur, y; const mc=document.createElement("canvas").getContext("2d");
+  const np=()=>{ cur=[]; pages.push(cur); y=H-M; }; np();
+  const larg=(t,sz,b)=>{ mc.font=`${b?"bold ":""}${sz}px Helvetica, Arial, sans-serif`; return mc.measureText(pdfTxt(t)).width; };
+  const esc=t=>pdfTxt(t).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+  const cor=(c)=>c?c.map(v=>(v/255).toFixed(3)).join(" "):"0 0 0";
+  const api={ W, H, M, get y(){ return y; }, set y(v){ y=v; },
+    need(hh){ if (y-hh < M){ np(); return true; } return false; },
+    txt(t, x, yy, sz=10, b=false, c){ cur.push(`BT ${cor(c)} rg /${b?"F2":"F1"} ${sz} Tf ${x.toFixed(2)} ${yy.toFixed(2)} Td (${esc(t)}) Tj ET`); },
+    quebra(t, w, sz=10, b=false){ const out=[]; String(t==null?"":t).split("\n").forEach(par=>{ let l=""; pdfTxt(par).split(" ").forEach(p=>{ const tt=l?l+" "+p:p; if (larg(tt,sz,b)>w && l){ out.push(l); l=p; } else l=tt; }); out.push(l); }); return out; },
+    para(t, o={}){ const sz=o.sz||10, b=!!o.b, x=o.x!=null?o.x:M, w=o.w||(W-2*M-(x-M)), lh=sz*1.32; api.quebra(t,w,sz,b).forEach(l=>{ api.need(lh); y-=lh; api.txt(l,x,y+sz*0.28,sz,b,o.c); }); },
+    rect(x, yy, w, hh, c){ cur.push(`${cor(c)} rg ${x.toFixed(2)} ${yy.toFixed(2)} ${w.toFixed(2)} ${hh.toFixed(2)} re f`); },
+    borda(x, yy, w, hh, lw=0.7){ cur.push(`0 0 0 RG ${lw} w ${x.toFixed(2)} ${yy.toFixed(2)} ${w.toFixed(2)} ${hh.toFixed(2)} re S`); },
+    linha(x1,y1,x2,y2,lw=0.7){ cur.push(`0 0 0 RG ${lw} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`); },
+    gap(n){ y-=n; },
+    h2(t){ api.need(26); y-=20; api.rect(M, y-2, W-2*M, 18, [17,17,17]); api.txt(t, M+6, y+3.5, 11, true, [255,255,255]); y-=4; },
+    kv(pares, cols=3){ const cw=(W-2*M)/cols; for (let i=0;i<pares.length;i+=cols){ const lin=pares.slice(i,i+cols); let alt=0; const bl=lin.map(([k,v],j)=>{ const span=(lin.length===1&&cols>1&&String(v).length>40)?cols:1; const L=api.quebra(v||"-", cw*span-8, 10.5, false); alt=Math.max(alt, 11+L.length*13); return {k,L,j}; });
+        api.need(alt+4); bl.forEach(({k,L,j})=>{ const x=M+j*cw; api.txt(String(k).toUpperCase(), x, y-8, 7, true, [100,100,100]); L.forEach((l,ii)=>api.txt(l, x, y-20-ii*13, 10.5)); }); y-=alt+4; api.linha(M, y+2, W-M, y+2, 0.3); } },
+    tabela(cab, linhas, larguras, o={}){ const sz=o.sz||9.5, tot=larguras.reduce((a,b)=>a+b,0), esc2=(W-2*M)/tot, ws=larguras.map(v=>v*esc2), al=o.dir||[];
+      const linhaT=(cels, b, fundo)=>{ const L=cels.map((c,i)=>api.quebra(c,ws[i]-8,sz,b)); const hh=Math.max(...L.map(l=>l.length))*sz*1.25+6; if (api.need(hh)) { if (!b) linhaT(cab,true,[235,235,235]); } y-=hh; if (fundo) api.rect(M,y,W-2*M,hh,fundo); let x=M; L.forEach((l,i)=>{ l.forEach((t,ii)=>{ const tx = al[i] ? x+ws[i]-4-larg(t,sz,b) : x+4; api.txt(t, tx, y+hh-4-sz-ii*sz*1.25+2, sz, b, cels.cor&&cels.cor[i]); }); api.borda(x,y,ws[i],hh,0.4); x+=ws[i]; }); };
+      linhaT(cab, true, [235,235,235]); linhas.forEach(l=>linhaT(l,false)); },
+    img(jpg, iw, ih, x, w){ const id=imgs.length; imgs.push({jpg, iw, ih}); const hh=w*ih/iw; api.need(hh+4); y-=hh; cur.push(`q ${w.toFixed(2)} 0 0 ${hh.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im${id} Do Q`); return hh; },
+    bytes(){ const enc=new TextEncoder(), parts=[], offs=[]; let len=0; const add=x=>{ const b = typeof x==="string" ? Uint8Array.from(x, ch=>ch.charCodeAt(0)&255) : x; parts.push(b); len+=b.length; };
+      const obj=(n, body)=>{ offs[n]=len; add(`${n} 0 obj\n`); body.forEach(add); add(`\nendobj\n`); };
+      add("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"); const nImg=imgs.length, firstImg=5, firstPage=firstImg+nImg;
+      obj(1,["<< /Type /Catalog /Pages 2 0 R >>"]);
+      obj(3,["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"]); obj(4,["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"]);
+      imgs.forEach((im,i)=>obj(firstImg+i,[`<< /Type /XObject /Subtype /Image /Width ${im.iw} /Height ${im.ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.jpg.length} >>\nstream\n`, im.jpg, "\nendstream"]));
+      const xo=imgs.map((_,i)=>`/Im${i} ${firstImg+i} 0 R`).join(" "), kids=[];
+      pages.forEach((pg,i)=>{ const pn=firstPage+i*2, cn=pn+1; kids.push(`${pn} 0 R`); const st=pg.join("\n");
+        obj(pn,[`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << ${xo} >> >> /Contents ${cn} 0 R >>`]);
+        obj(cn,[`<< /Length ${st.length} >>\nstream\n`, st, "\nendstream"]); });
+      obj(2,[`<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages.length} >>`]);
+      const total=firstPage+pages.length*2, xref=len; add(`xref\n0 ${total}\n0000000000 65535 f \n`);
+      for (let i=1;i<total;i++) add(String(offs[i]||0).padStart(10,"0")+" 00000 n \n");
+      add(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+      const out=new Uint8Array(len); let o2=0; parts.forEach(b=>{ out.set(b,o2); o2+=b.length; }); return out; } };
+  return api; }
+function paraJpeg(src, maxW=600){ return new Promise((ok)=>{ if (!src){ ok(null); return; } const im=new Image(); im.onload=()=>{ try{ const k=Math.min(1, maxW/im.width), c=document.createElement("canvas"); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height); const b=atob(c.toDataURL("image/jpeg",0.85).split(",")[1]); ok({jpg:Uint8Array.from(b,ch=>ch.charCodeAt(0)), w:c.width, h:c.height}); }catch(e){ ok(null); } }; im.onerror=()=>ok(null); im.src=src; }); }
+async function pdfCabecalho(P, titulo, numero, sub){ const lg=await paraJpeg(LOGO_EMPRESA, 200); const y0=P.y;
+  if (lg){ P.img(lg.jpg, lg.w, lg.h, P.M, 46); P.y=y0; }
+  P.txt(titulo, P.M+(lg?58:0), y0-20, 17, true); P.txt(nomeEmp()+(sub?"  -  "+sub:""), P.M+(lg?58:0), y0-36, 9.5, false, [80,80,80]);
+  const nw=numero.length*13+20; P.borda(P.W-P.M-nw, y0-42, nw, 34, 1.6); P.txt(numero, P.W-P.M-nw+10, y0-31, 20, true);
+  P.y=y0-50; P.rect(P.M, P.y, P.W-2*P.M, 3, [249,115,22]); P.gap(6); }
+async function pdfNotaApanha(a){ const P=pdfNovo(), c=S.clientes.find(x=>x.id===a.clienteId)||{}, E=(c.endereco&&typeof c.endereco==="object")?c.endereco:{}, v=a.vistoria||{itens:{}};
+  await pdfCabecalho(P, "NOTA DE APANHA", codNA(a), "vistoria do veículo na entrada");
+  P.h2("Cliente"); P.kv([["Nome",a.cliente],[(c.pessoa==="J"||String(c.doc||"").replace(/\D/g,"").length===14)?"CNPJ":"CPF",c.doc||"-"],["Telefone / WhatsApp",a.telefone||c.telefone||"-"]]);
+  P.kv([["Endereço",[E.rua,E.numero,E.bairro,E.cidade&&(E.cidade+(E.uf?"/"+E.uf:"")),E.cep&&("CEP "+E.cep)].filter(Boolean).join(", ")||"-"]],1);
+  P.h2("Veículo"); P.kv([["Veículo",a.veiculo||"-"],["Placa",a.placa||"-"],["Motor",a.motor||"-"],["KM",v.km||"-"],["Cor",v.cor||"-"],["Ano",v.ano||"-"],["Combustível",v.comb||"-"],["Pneus",v.pneus||"-"],["Chassi",v.chassi||"-"]]); P.kv([["Bateria (marca, modelo e dados)",v.bateria||"-"]],1);
+  P.h2("Vistoria: acessórios e estado");
+  const rot={S:"Tem",N:"Não tem",A:"AVARIADO"}, its=APANHA_ITENS.map(x=>[x, rot[(v.itens||{})[x]]||"-"]), metade=Math.ceil(its.length/2), linhas=[];
+  for (let i=0;i<metade;i++){ const l=[its[i][0], its[i][1], (its[metade+i]||["",""])[0], (its[metade+i]||["",""])[1]]; l.cor=[null, its[i][1]==="AVARIADO"?[200,0,0]:null, null, (its[metade+i]||[])[1]==="AVARIADO"?[200,0,0]:null]; linhas.push(l); }
+  P.tabela(["Item","Situação","Item","Situação"], linhas, [34,16,34,16], {sz:8.5});
+  P.gap(4); P.para("Avarias na lataria: "+((v.avarias||[]).join(", ")||"nenhuma marcada"), {sz:10, b:true}); if (v.compl) P.para("Como chegou / serviços complementares: "+v.compl, {sz:10}); if (v.obs) P.para("Observações: "+v.obs, {sz:10});
+  P.h2("Serviços solicitados pelo cliente"); P.para(a.servicosSolicitados||"-", {sz:10.5});
+  if (a.servicoAutorizado){ P.gap(6); P.need(30); P.y-=26; P.borda(P.M, P.y, P.W-2*P.M, 24, 1.4); P.txt(`Serviço autorizado: ${a.servicoAutorizado}  -  ${money(a.desmontagem||0)}`, P.M+8, P.y+8, 12.5, true); P.gap(4); P.para(a.termoDesmontagem||"", {sz:9.5}); }
+  P.gap(4); P.para(TERMO_APANHA, {sz:9, b:true}); P.para(`Autorizo a ${nomeEmp()} a consultar o meu cadastro junto aos órgãos competentes, como SPC e Serasa, bem como executar os serviços necessários acima descritos.`, {sz:9});
+  P.gap(4); P.kv([["Recebido por",a.porNome||"-"],["Data da entrada",dt(a.em)],["Data da saída",a.saidaEm?dt(a.saidaEm):"___/___/______"]]);
+  const as=a.assinatura?await paraJpeg(a.assinatura.img, 500):null; P.need(70); P.gap(as?4:40);
+  if (as){ const y0=P.y; P.img(as.jpg, as.w, as.h, P.M+40, 160); P.y=Math.min(P.y, y0-50); }
+  P.linha(P.M, P.y, P.M+230, P.y); P.linha(P.W-P.M-230, P.y, P.W-P.M, P.y); P.txt("Cliente: "+(a.assinatura?a.assinatura.nome:(a.cliente||"")), P.M+4, P.y-12, 9); P.txt(nomeEmp(), P.W-P.M-226, P.y-12, 9);
+  if (a.assinatura){ P.y-=16; P.para(`Assinado ${a.assinatura.remota?"pelo link do WhatsApp":"na tela, na loja"} por ${a.assinatura.nome}${a.assinatura.doc?" (CPF/CNPJ "+a.assinatura.doc+")":""} em ${dt(a.assinatura.em)}.`, {sz:8.5, c:[70,70,70]}); }
+  else if (a.assinadoPapel){ P.y-=16; P.para(`Cliente assinou a via em papel (confirmado por ${a.assinadoPapel.porNome} em ${dt(a.assinadoPapel.em)}).`, {sz:8.5, c:[70,70,70]}); }
+  return P.bytes(); }
+async function pdfOrcamentoOS(o){ const P=pdfNovo(), c=cliDaOS(o)||{}, tot=totalOS(o);
+  await pdfCabecalho(P, o.status==="orcamento"?"ORÇAMENTO":"ORDEM DE SERVIÇO", codOS(o), o.status==="orcamento"?"para a sua aprovação":(STATUS[o.status]?.t||""));
+  P.h2("Cliente e veículo"); P.kv([["Cliente",o.cliente||"-"],["Telefone",o.telefone||c.telefone||"-"],["Data",dt(Date.now())],["Veículo",o.veiculo||"-"],["Placa",o.placa||"-"],["Motor",o.motor||"-"]]);
+  if (o.apanhaNum) P.para(`Veículo recebido pela Nota de apanha NA-${String(o.apanhaNum).padStart(4,"0")}.`, {sz:9});
+  P.h2("Serviços"); if ((o.servicos||[]).length) P.tabela(["Serviço","Qtd","Valor","Total"], o.servicos.map(x=>[x.desc, String(x.qtd||1), money(x.valor), money(sTot(x))]), [58,8,17,17], {dir:[0,1,1,1]}); else P.para("Ainda sem serviços.", {sz:10});
+  if ((o.pecas||[]).length){ P.h2("Peças"); P.tabela(["Peça","Qtd","Valor","Total"], o.pecas.map(x=>[x.nome, String(x.qtd), money(x.preco), money(x.qtd*x.preco)]), [58,8,17,17], {dir:[0,1,1,1]}); }
+  P.gap(8); const lin=(t,v,b,sz=11)=>{ P.need(18); P.y-=16; const w=P.W-P.M; P.txt(t, w-260, P.y, sz, b); const vv=String(v); P.txt(vv, w-4-vv.length*sz*0.55, P.y, sz, b); };
+  lin("Mão de obra", money(totalServ(o))); lin("Peças", money(totalPecas(o))); if (o.desconto) lin("Desconto", "- "+money(o.desconto)); P.gap(4); lin("TOTAL", money(tot), true, 15);
+  if (o.previsao){ P.gap(6); P.para("Previsão de entrega: "+dia(o.previsao), {sz:10.5, b:true}); }
+  if (o.status==="orcamento"){ P.gap(6); P.para("Validade deste orçamento: 7 dias. O serviço só começa depois da sua aprovação.", {sz:10}); }
+  P.gap(6); P.para(termoAprovacao(o, tot, o.previsao), {sz:8.5, c:[70,70,70]});
+  const asO=assinaturaOS(o), asE=o.assinaturaApanha&&o.assinaturaApanha.img?o.assinaturaApanha:null;
+  for (const [as, rot] of [[asE, "Autorização na entrada (nota de apanha)"], [asO, o.aprovacaoRemota===asO||(o.aprovacoes||[]).some(x=>x.assinatura===asO)?"Aprovação do orçamento":"Assinatura do cliente"]]){ if (!as) continue;
+    const j=await paraJpeg(as.img, 500); P.need(90); P.gap(10); P.para(rot, {sz:10, b:true}); if (j){ const y0=P.y; P.img(j.jpg, j.w, j.h, P.M+10, 150); P.y=Math.min(P.y, y0-45); }
+    P.linha(P.M, P.y, P.M+260, P.y); P.y-=2; P.para(`${as.nome||""}${as.doc?" · CPF/CNPJ "+as.doc:""} · ${dt(as.em)}${as.remota?" · pelo link do WhatsApp":" · na loja"}${as.valor!=null?" · valor "+money(as.valor):""}`, {sz:8.5, c:[70,70,70]}); }
+  return P.bytes(); }
+async function compartilharPdf(bytes, nome, texto, fone){ const file=new File([bytes], nome, {type:"application/pdf"});
+  try{ if (navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], text:texto, title:nome}); return "share"; } }catch(e){ if (e && e.name==="AbortError") return "cancel"; }
+  const u=URL.createObjectURL(file), aEl=document.createElement("a"); aEl.href=u; aEl.download=nome; document.body.appendChild(aEl); aEl.click(); aEl.remove(); setTimeout(()=>URL.revokeObjectURL(u), 60000);
+  const wa=foneWa(fone||""); if (wa) window.open(`https://wa.me/${wa}?text=${encodeURIComponent(texto+"\n\n(segue o PDF em anexo)")}`, "_blank");
+  toast("📄 PDF baixado. No WhatsApp, toque no 📎 e anexe o arquivo "+nome); return "download"; }
+async function criarPedidoAssinaturaNota(a, tk){ const agora=Date.now();
+  await db.doc("assinaturasPendentes/"+tk).set({tipo:"apanha", apanhaId:a.id, osId:null, codigo:codNA(a), cliente:String(a.cliente||"").split(" ")[0], motor:[a.veiculo,a.placa].filter(Boolean).join(" ")+(a.motor?" · motor "+a.motor:""), valor:Number(a.desmontagem)||0, aprovar:false,
+    servicos:a.servicoAutorizado?[a.servicoAutorizado+": "+money(a.desmontagem||0)]:[], pecas:[], previsao:"", termo:a.termoDesmontagem||termoDesmontagem([a.veiculo,a.placa].filter(Boolean).join(" "), a.desmontagem, a.servicoAutorizado), empresa:nomeEmp(), criadoEm:agora, expira:agora+7*864e5, porNome:me.nome, usado:false});
+  await db.doc("apanhas/"+a.id).update({assinaturaPedido:{token:tk, em:agora, porNome:me.nome}, hist:(a.hist||[]).concat([{em:agora, porNome:me.nome, txt:"📲 Link para o cliente assinar a nota pelo celular enviado por "+me.nome}])}); }
+async function enviarPdfNota(a, comLink){ try{ toast("Preparando o PDF…"); const b=await pdfNotaApanha(a);
+    let lk=""; if (comLink && !a.assinatura){ if (!ponteUrl()) toast("⚠️ Sem a ponte ligada não dá para mandar o link. Vai só o PDF."); else { const tk=novoToken(); await criarPedidoAssinaturaNota(a, tk); lk=ponteUrl()+"?assinar="+tk; a.hist=(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"📲 Link para o cliente assinar a nota pelo celular enviado por "+me.nome}]); a.assinaturaPedido={token:tk, em:Date.now(), porNome:me.nome}; } }
+    const msg=`Olá, ${String(a.cliente||"").split(" ")[0]}! Aqui é ${me.nome}, da ${nomeEmp()}.\nSegue a Nota de apanha ${codNA(a)} do seu ${a.veiculo||"veículo"}${a.placa?" ("+a.placa+")":""}, com a vistoria da entrada.${a.servicoAutorizado?`\nServiço autorizado: ${a.servicoAutorizado} · ${money(a.desmontagem||0)}.`:""}${lk?`\n\n👉 Para autorizar, toque no link, confira e assine com o dedo:\n${lk}\n(o link vale 7 dias)`:"\nVamos avaliar e mandamos o orçamento por aqui. 👍"}`;
+    const r=await compartilharPdf(b, `Nota-de-apanha-${codNA(a)}.pdf`, msg, a.telefone); if (r!=="cancel") db.doc("apanhas/"+a.id).update({pdfEnviadoEm:Date.now(), hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"📲 Nota em PDF enviada ao cliente pelo WhatsApp"}])}).catch(()=>{}); }catch(err){ erro(err); } }
+async function enviarPdfOrcamento(o){ try{ toast("Preparando o PDF…"); const b=await pdfOrcamentoOS(o);
+    const msg=`Olá, ${String(o.cliente||"").split(" ")[0]}! Aqui é ${me.nome}, da ${nomeEmp()}.\nSegue o ${o.status==="orcamento"?"orçamento":"resumo da OS"} ${codOS(o)} do ${o.veiculo||o.motor||"seu motor"}: total ${money(totalOS(o))}.${o.status==="orcamento"?"\nPode responder por aqui se aprova. 👍":""}`;
+    const r=await compartilharPdf(b, `${o.status==="orcamento"?"Orcamento":"OS"}-${codOS(o)}.pdf`, msg, o.telefone); if (r!=="cancel") patchOS(o.id, d=>addHist(d, `📲 ${o.status==="orcamento"?"Orçamento":"OS"} em PDF enviado ao cliente pelo WhatsApp`)).catch(()=>{}); }catch(err){ erro(err); } }
+function htmlA3Apanha(a){ const c=S.clientes.find(x=>x.id===a.clienteId)||{}, E=(c.endereco&&typeof c.endereco==="object")?c.endereco:{}, cnpj=c.pessoa==="J"||String(c.doc||"").replace(/\D/g,"").length===14;
+  const end=[E.rua, E.numero, E.bairro, E.cidade&&(E.cidade+(E.uf?"/"+E.uf:"")), E.cep&&("CEP "+E.cep)].filter(Boolean).join(", ");
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Nota de apanha ${h(codNA(a))}</title><style>${CSS_A3}</style></head><body>
+  <header><div>${logoImpr()}<div style="margin-top:4px;font-size:14px">${h(nomeEmp())}</div></div><div style="text-align:center"><h1>NOTA DE APANHA</h1><span class="tag">VISTORIA DO VEÍCULO</span></div><div class="num">${h(codNA(a))}</div></header>
+  <h2>👤 Cliente</h2><div class="g g3"><div><b>Nome</b>${h(a.cliente||"—")}</div><div><b>${cnpj?"CNPJ":"CPF"}</b>${h(c.doc||"—")}</div><div><b>Telefone / WhatsApp</b>${h(a.telefone||c.telefone||"—")}</div><div style="grid-column:1/-1"><b>Endereço</b>${h(end||"—")}${E.comp?" · "+h(E.comp):""}</div></div>
+  <h2>🚗 Veículo</h2><div class="g g4"><div><b>Veículo</b>${h(a.veiculo||"—")}</div><div><b>Placa</b>${h(a.placa||"—")}</div><div><b>Motor</b>${h(a.motor||"—")}</div><div><b>🔋 Bateria</b>${h((a.vistoria||{}).bateria||"—")}</div></div>
+  ${htmlApanhaImp(a.vistoria||{itens:{}})}
+  <h2>🔧 Serviços solicitados pelo cliente</h2><div class="obs" style="min-height:50px;font-size:17px">${h(a.servicosSolicitados||"")}</div>
+  ${a.desmontagem?`<div style="font-size:19px;margin-top:8px;border:3px solid #000;padding:6px 10px;border-radius:6px"><b>Serviço autorizado: ${h(a.servicoAutorizado||"")} · ${money(a.desmontagem)}</b></div><p class="termo">${h(a.termoDesmontagem||"")}</p>`:""}
+  <p style="font-size:14px;font-weight:700;margin-top:12px">${h(TERMO_APANHA)}</p><p class="termo">Autorizo a ${h(nomeEmp())} a consultar o meu cadastro junto aos órgãos competentes, como SPC e Serasa, bem como executar os serviços necessários acima descritos.</p>
+  <div class="g g3" style="margin-top:8px"><div><b>Recebido por</b>${h(a.porNome||"")}</div><div><b>Data da entrada</b>${dt(a.em)}</div><div><b>Data da saída</b>${a.saidaEm?dt(a.saidaEm):"____/____/______"}</div></div>
+  <div class="assin"><div>${a.assinatura?`<img src="${a.assinatura.img}" alt="Assinatura" style="max-height:70px;max-width:90%;display:block;margin:0 auto 4px">`:""}Cliente: ${h(a.assinatura?a.assinatura.nome:a.cliente||"")}${a.assinatura?" · "+h(a.assinatura.doc||"")+`<br><small>assinado em ${dt(a.assinatura.em)}</small>`:""}</div><div>${h(nomeEmp())}</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>`; }
+const imprimirNotaApanha = a => folhaParaImprimir("Nota de apanha "+codNA(a), `nota-apanha-${a.numero}.html`, htmlA3Apanha(a));
+function formEditarNota(a){ const v=Object.assign(apanhaNova(), JSON.parse(JSON.stringify(a.vistoria||{}))); v.itens=v.itens||{}; v.avarias=v.avarias||[];
+  abrirModal(`<h2>🚗 Nota de apanha ${codNA(a)}</h2><p class="muted" style="margin:0">${h(a.cliente)} · ${h(a.veiculo)} ${h(a.placa||"")}</p>
+    <label class="f" style="margin-top:8px">Serviços solicitados pelo cliente<textarea id="ne-s" rows="2">${h(a.servicosSolicitados||"")}</textarea></label>${htmlApanha(v,"ne")}
+    <div class="acts"><button class="btn" id="ne-x">Cancelar</button><button class="btn pri" id="ne-ok">💾 Salvar alterações</button></div>`, m=>{ ligarApanha(m,"ne",v); $("#ne-x",m).onclick=fecharModal;
+    $("#ne-ok",m).onclick=async()=>{ const f=faltaApanha(v); if (f.length){ toast("Falta: "+f.join(", ")); return; } try{ await db.doc("apanhas/"+a.id).update({vistoria:v, servicosSolicitados:$("#ne-s",m).value.trim(), editadoEm:Date.now(), editadoPorNome:me.nome, hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"✏️ ALTERADA · "+textoApanha(v, me.nome)}])}); fecharModal(); toast("✅ Nota alterada"); }catch(err){ erro(err); } }; }); }
+function verNotaApanha(a){ const o=a.osId?S.os.find(x=>x.id===a.osId):null;
+  abrirModal(`<h2>🚗 ${codNA(a)} · ${h(a.cliente)}</h2><p style="margin:0 0 6px">${h(a.veiculo)} ${h(a.placa||"")} ${a.motor?"· "+h(a.motor):""} · recebida por ${h(a.porNome||"")} em ${dt(a.em)}</p>
+    ${SEM_OS()?"":`<p style="margin:0 0 8px">${o?`🔧 Virou a <b>OS ${codOS(o)}</b> · ${h(STATUS[o.status]?.t||"")}`:`<span style="color:var(--warn)">🚗 No pátio · ainda sem OS</span>`}</p>`}
+    <div style="display:grid;gap:8px"><div class="row" style="gap:8px"><button class="btn pri" data-na="imp" style="flex:1;justify-content:center;min-height:52px">🖨 Via do cliente (A3)</button><button class="btn pri" data-na="ofi" style="flex:1;justify-content:center;min-height:52px">🖨 Via da oficina (A3)</button></div>
+    ${!podeAbrirOS()||SEM_OS()?"":o?`<button class="btn" data-na="os" style="justify-content:center;min-height:48px">Abrir a OS ${codOS(o)}</button>`:`<button class="btn" data-na="nova" style="justify-content:center;min-height:48px">🔧 Abrir a OS desta nota</button>`}
+    <button class="btn" data-na="pdf" style="justify-content:center;min-height:52px;background:#1fa855;border-color:#1fa855;color:#fff">📲 Enviar a nota em PDF pelo WhatsApp</button>
+    ${a.assinatura?`<div class="card" style="padding:8px 12px">✅ ${h(a.servicoAutorizado||"Serviço")} (${money(a.desmontagem||0)}) autorizado e assinado por <b>${h(a.assinatura.nome)}</b>${a.assinatura.doc?" ("+h(a.assinatura.doc)+")":""} ${a.assinatura.remota?"<b>pelo link no celular</b>":""} em ${dt(a.assinatura.em)}<br><img src="${a.assinatura.img}" alt="Assinatura" data-na="zoom" style="max-height:60px;background:#fff;border-radius:6px;padding:3px 8px;margin-top:4px;cursor:zoom-in"></div>`
+     : a.assinadoPapel?`<div class="card" style="padding:8px 12px">✅ ${h(a.servicoAutorizado||"Serviço")} (${money(a.desmontagem||0)}) · cliente <b>assinou o papel</b> (confirmado por ${h(a.assinadoPapel.porNome)} em ${dt(a.assinadoPapel.em)})</div>`
+     : `${a.assinaturaPedido?`<div class="banner" style="margin:0">⏳ Link para assinar enviado por ${h(a.assinaturaPedido.porNome||"")} em ${dt(a.assinaturaPedido.em)} · esperando o cliente assinar</div>`:""}
+        <button class="btn" data-na="link" style="justify-content:center;min-height:48px">📲 ${a.assinaturaPedido?"Mandar o link de novo":"Cliente não está aqui: mandar link para assinar"}</button>
+        <button class="btn" data-na="ass" style="justify-content:center;min-height:48px">📱 Cliente está aqui: assinar na tela agora</button>
+        <button class="btn" data-na="papel" style="justify-content:center;min-height:48px;border-color:var(--warn)">✍️ Cliente assinou o papel? Toque para confirmar</button>`}
+    <button class="btn" data-na="ed" style="justify-content:center">✏️ Corrigir a vistoria</button></div>
+    ${(a.fotos||[]).length?`<div style="margin-top:10px"><b>📷 Fotos da chegada (${a.fotos.length})</b><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${a.fotos.map(f=>`<a href="#" data-blobhref="${h(f.id)}" target="_blank" rel="noopener"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(f.id)}" alt="Foto" style="width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"></a>`).join("")}</div></div>`:""}
+    <details style="margin-top:10px"><summary><b>🕘 Histórico da nota</b></summary><ul class="hist">${(a.hist||[]).slice().reverse().map(x=>`<li><div class="t num">${dt(x.em)}<br>${h(x.porNome||"")}</div><div style="white-space:pre-wrap">${h(x.txt)}${x.foto?`<br><a href="#" data-blobhref="${h(x.foto)}" target="_blank" rel="noopener"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(x.foto)}" alt="Foto" style="max-width:160px;max-height:110px;border-radius:6px;margin-top:4px"></a>`:""}</div></li>`).join("")}</ul></details>
+    <div class="acts"><button class="btn" id="vn-x">Fechar</button></div>`, m=>{ $("#vn-x",m).onclick=fecharModal;
+    m.addEventListener("click", e=>{ const b=e.target.closest("[data-na]"); if(!b) return; const k=b.dataset.na; fecharModal(); setTimeout(()=>{ if(k==="imp") imprimirNotaApanha(a); if(k==="ofi") imprimirOficinaNota(a); if(k==="os") abrirOS(o.id); if(k==="nova") abrirOSdaNota(a); if(k==="ed") formEditarNota(a); if(k==="ass") formAssinarNota(a); if(k==="pdf") enviarPdfNota(a, !a.assinatura && !a.assinadoPapel && a.assinaComo==="link"); if(k==="link") enviarPdfNota(a, true); if(k==="zoom") ampliarAss({__rot:"Nota "+codNA(a)}, a.assinatura); if(k==="papel") db.doc("apanhas/"+a.id).update({assinadoPapel:{em:Date.now(), por:me.id, porNome:me.nome}, hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"✍️ Cliente assinou a nota no papel (confirmado por "+me.nome+")"}])}).then(()=>toast("✅ Marcado como assinado")).catch(erro); },120); }); }); }
+function formAssinarNota(a){ const c=S.clientes.find(x=>x.id===a.clienteId)||{}; const termo=a.termoDesmontagem||termoDesmontagem([a.veiculo,a.placa].filter(Boolean).join(" "), a.desmontagem, a.servicoAutorizado);
+  abrirModal(`<h2>✍️ Autorização do cliente · ${codNA(a)}</h2>${htmlBlocoAssinatura()}<div class="acts"><button class="btn" id="fa-x">Cancelar</button><button class="btn pri" id="fa-ok">Salvar assinatura</button></div>`, m=>{
+    const bl=ligarBlocoAssinatura(m, ()=>"Pessoalmente", termo, a.cliente, c.doc); $("#fa-x",m).onclick=fecharModal;
+    $("#fa-ok",m).onclick=async()=>{ const r=bl.ler(); if (!r.ok) return; try{ await db.doc("apanhas/"+a.id).update({assinatura:r.ass, hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:`✍️ ${r.ass.nome} (${r.ass.doc}) autorizou ${a.servicoAutorizado||"o serviço"} · ${money(a.desmontagem||0)}`}])}); fecharModal(); toast("✅ Assinatura salva"); }catch(err){ erro(err); } }; }); }
+SHELL.apanhas = () => `<div class="top"><h1>🚗 Notas de apanha</h1><button class="btn pri" id="na-nova">+ Nova nota de apanha</button></div>
+  <div class="banner" style="margin:0 0 10px">${ehLojista()&&LOJISTA_TESTE?"🧪 <b>Período de teste:</b> aqui você faz a <b>nota de apanha</b> (vistoria, impressão, PDF e assinatura). O resto continua na Softcom.":"Carro que chega <b>fechado</b>: primeiro a <b>nota de apanha</b> (a vistoria). Depois da avaliação, você abre a <b>OS</b> a partir da nota."}</div>
+  <div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap"><input id="na-q" placeholder="Buscar: cliente, placa, carro, NA-0001…" value="${h(UI.naQ||"")}" style="flex:1;min-width:200px"><div class="seg" id="na-f">${(SEM_OS()?[["todas","Todas"],["semass","Falta assinar"]]:[["abertas","No pátio, sem OS"],["todas","Todas"]]).map(([k,t])=>`<button type="button" data-k="${k}" class="${(UI.naF||(SEM_OS()?"todas":"abertas"))===k?"on":""}">${t}</button>`).join("")}</div></div>
+  <div id="na-l"></div>`;
+BIND.apanhas = () => { $("#na-nova").onclick=()=>novaNotaApanha(); $("#na-q").oninput=e=>{ UI.naQ=e.target.value; FILL.apanhas(); };
+  $("#na-f").onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; UI.naF=b.dataset.k; $("#na-f").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); FILL.apanhas(); };
+  $("#na-l").onclick=e=>{ const b=e.target.closest("[data-nid]"); if(!b) return; const a=S.apanhas.find(x=>x.id===b.dataset.nid); if (a) verNotaApanha(a); }; };
+FILL.apanhas = () => { if (!$("#na-l")) return; const q=norm(UI.naQ||""), fx=UI.naF||(SEM_OS()?"todas":"abertas");
+  const L=S.apanhas.filter(a=>((SEM_OS()?(fx!=="semass"||!(a.assinatura||a.assinadoPapel)):(fx==="todas"||!a.osId))) && (!q || norm([codNA(a),a.cliente,a.veiculo,a.placa,a.motor].join(" ")).includes(q)));
+  $("#na-l").innerHTML = L.length ? L.map(a=>{ const o=a.osId?S.os.find(x=>x.id===a.osId):null, av=APANHA_ITENS.filter(x=>((a.vistoria||{}).itens||{})[x]==="A").length;
+    return `<div class="card click" data-nid="${a.id}" style="margin-bottom:8px;padding:12px 14px;cursor:pointer"><div class="row" style="gap:8px;flex-wrap:wrap"><b class="mono">${codNA(a)}</b><b>${h(a.cliente)}</b><span class="spacer"></span>${SEM_OS()?"":o?`<span class="pill p-${o.status}">🔧 ${codOS(o)} · ${h(STATUS[o.status]?.t||"")}</span>`:`${SEM_OS()?"":`<span class="pill p-aguardando">🚗 No pátio · sem OS</span>`}`}</div>
+      <div class="muted" style="font-size:14px;margin-top:4px">${h(a.veiculo||"")} ${h(a.placa||"")} · KM ${h((a.vistoria||{}).km||"")} · ⛽ ${h((a.vistoria||{}).comb||"")} · ${dt(a.em)} · ${h(a.porNome||"")}${av?` · <span style="color:var(--bad)">⚠️ ${av} avariado(s)</span>`:""}${a.assinatura||a.assinadoPapel?"":a.assinaturaPedido?` · <span style="color:var(--warn)">📲 esperando assinar pelo link</span>`:` · <span style="color:var(--warn)">✍️ falta assinar o papel</span>`}</div></div>`; }).join("") : `<div class="empty">${fx==="abertas"?"Nenhuma nota aqui.":"Nenhuma nota de apanha ainda."}</div>`; };
+function endTxt(c){ const E=(c.endereco&&typeof c.endereco==="object")?c.endereco:{}; return typeof c.endereco==="string"?c.endereco:[E.rua&&(E.rua+(E.numero?", "+E.numero:"")), E.complemento, E.bairro, E.cidade&&(E.cidade+(E.uf?"/"+E.uf:"")), E.cep&&("CEP "+E.cep)].filter(Boolean).join(" · "); }
+function osDoCliente(c){ return S.os.filter(o=>o.clienteId===c.id || (!o.clienteId && o.cliente===c.nome)).sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0)); }
+function notasDoCliente(c){ return S.apanhas.filter(a=>a.clienteId===c.id).sort((a,b)=>(b.em||0)-(a.em||0)); }
+/* junta TODOS os dados de cada veículo do cliente: cadastro do carro + notas de apanha + OS (o mais novo vale) */
+function veiculosCompletos(c){ const M=new Map(), chave=x=>(String(x.placa||"").replace(/\W/g,"").toUpperCase())||norm((x.veiculo||"")+"|"+(x.motor||"")), linhaN=l=>l?(typeof nomeLinha==="function"?nomeLinha(l):l):"";
+  const junta=(base, em, extra)=>{ if (!(base.veiculo||base.placa||base.motor)) return; const k=chave(base); const v=M.get(k)||{notas:[], os:[]};
+    Object.entries(base).forEach(([kk,vv])=>{ if (vv!=null && String(vv).trim()!=="" && (!v["_t_"+kk] || em>=v["_t_"+kk])){ v[kk]=vv; v["_t_"+kk]=em; } });
+    if (extra) extra(v); M.set(k, v); };
+  (c.veiculos||[]).forEach(x=>junta({veiculo:x.veiculo, placa:String(x.placa||"").toUpperCase(), ano:x.ano, motor:x.motor, bateria:x.bateria}, x.em||0));
+  (SEM_OS()?[]:S.os).filter(o=>o.clienteId===c.id || (!o.clienteId && o.cliente===c.nome)).forEach(o=>junta({veiculo:o.veiculo, placa:String(o.placa||"").toUpperCase(), motor:o.motor, linha:linhaN(o.linha)}, o.criadoEm||0, v=>v.os.push(codOS(o))));
+  S.apanhas.filter(a=>a.clienteId===c.id).forEach(a=>{ const t=a.vistoria||{}; junta({veiculo:a.veiculo, placa:String(a.placa||"").toUpperCase(), motor:a.motor, linha:linhaN(a.linha), ano:t.ano, bateria:t.bateria, cor:t.cor, chassi:t.chassi, km:t.km?(t.km+" (em "+new Date(a.em||0).toLocaleDateString("pt-BR")+")"):"", comb:t.comb, pneus:t.pneus, avarias:(t.avarias||[]).join(", ")}, a.em||0, v=>v.notas.push(codNA(a))); });
+  return [...M.values()].map(v=>{ Object.keys(v).filter(k=>k.startsWith("_t_")).forEach(k=>delete v[k]); return v; }); }
+const CAMPOS_VEIC = [["veiculo","Veículo"],["placa","Placa"],["ano","Ano"],["cor","Cor"],["chassi","Chassi"],["motor","Motor"],["bateria","Bateria (modelo e dados)"],["linha","Linha"],["km","KM"],["comb","Combustível (última entrada)"],["pneus","Pneus"],["avarias","Avarias na lataria (última entrada)"]];
+function textoVeiculo(v){ return CAMPOS_VEIC.filter(([k])=>v[k]).map(([k,t])=>`${t}: ${v[k]}`).concat(v.notas.length?["Notas de apanha: "+v.notas.join(", ")]:[], v.os.length?["OS: "+v.os.join(", ")]:[]).join("\n"); }
+function textoCliente(c){ const L=[`Nome: ${c.nome||""}`, `${String(c.doc||"").replace(/\D/g,"").length===14?"CNPJ":"CPF"}: ${c.doc||"—"}`, `Telefone: ${c.telefone||"—"}`]; if (c.email) L.push("E-mail: "+c.email); L.push("Endereço: "+(endTxt(c)||"—"));
+  veiculosCompletos(c).forEach((v,i)=>{ L.push(""); L.push(`— VEÍCULO ${i+1} —`); L.push(textoVeiculo(v)); }); return L.join("\n"); }
+SHELL.clihist = () => `<div class="top"><h1>👥 Histórico dos clientes</h1></div>
+  <div class="banner" style="margin:0 0 10px">🔒 Aqui é <b>só para ver</b>: nada pode ser mudado. Use para conferir e <b>copiar os dados para o outro sistema</b>.</div>
+  <input id="ch-q" placeholder="Buscar: nome, CPF, telefone, placa…" value="${h(UI.chQ||"")}" style="width:100%;margin-bottom:10px"><div id="ch-l"></div>`;
+BIND.clihist = () => { $("#ch-q").oninput=e=>{ UI.chQ=e.target.value; FILL.clihist(); };
+  $("#ch-l").onclick=e=>{ const b=e.target.closest("[data-cid]"); if(!b) return; const c=S.clientes.find(x=>x.id===b.dataset.cid); if (c) verHistCliente(c); }; };
+FILL.clihist = () => { if (!$("#ch-l")) return; const q=norm(UI.chQ||""), qd=String(UI.chQ||"").replace(/\D/g,"");
+  const L=S.clientes.filter(c=>!q || norm([c.nome,c.telefone,c.doc,(c.veiculos||[]).map(v=>[v.veiculo,v.placa].join(" ")).join(" ")].join(" ")).includes(q) || (qd.length>=3 && (String(c.doc||"").replace(/\D/g,"").includes(qd) || String(c.telefone||"").replace(/\D/g,"").includes(qd))))
+    .sort((a,b)=>String(a.nome||"").localeCompare(String(b.nome||""),"pt")).slice(0,80);
+  $("#ch-l").innerHTML = L.length ? L.map(c=>{ const nn=notasDoCliente(c).length, no=SEM_OS()?0:osDoCliente(c).length;
+    return `<div class="card click" data-cid="${c.id}" style="margin-bottom:8px;padding:12px 14px;cursor:pointer"><b style="font-size:17px">${h(c.nome)}</b><div class="muted" style="font-size:14px;margin-top:3px">${h(c.telefone||"")}${c.doc?" · "+h(c.doc):""}${(c.veiculos||[]).length?" · 🚗 "+h((c.veiculos||[]).map(v=>[v.veiculo,v.placa].filter(Boolean).join(" ")).join(", ")):""}${nn?` · ${nn} nota(s) de apanha`:""}${no?` · ${no} OS`:""}</div></div>`; }).join("") : `<div class="empty">Nenhum cliente encontrado.</div>`; };
+function verHistCliente(c){ const ns=notasDoCliente(c), os=osDoCliente(c), V=veiculosCompletos(c);
+  const lin=(k,v)=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><div class="muted" style="font-size:12px;text-transform:uppercase">${k}</div><div style="font-size:16px;user-select:text;${v?"cursor:copy":""}" ${v?"data-cp=\"1\"":""}>${v||"—"}</div></div>`;
+  abrirModal(`<h2>👤 ${h(c.nome)}</h2><div class="muted" style="font-size:13px;margin:-4px 0 8px">🔒 Só leitura · cadastrado em ${dt(c.criadoEm||c.em||0)}<br>👆 <b>Toque em qualquer dado</b> para copiar só ele (e colar no campo do outro sistema).</div>
+    <button class="btn pri" id="hc-cp" style="width:100%;justify-content:center;min-height:52px;margin-bottom:8px">📋 Copiar tudo: cliente + veículos (para colar no outro sistema)</button>
+    ${lin(String(c.doc||"").replace(/\D/g,"").length===14?"CNPJ":"CPF", h(c.doc))}${lin("Telefone / WhatsApp", h(c.telefone))}${c.email?lin("E-mail", h(c.email)):""}${lin("Endereço", h(endTxt(c)))}
+    <h3 style="margin:12px 0 4px">🚗 Veículos (${V.length})</h3>${V.length?V.map((v,i)=>`<div class="card" style="padding:10px 12px;margin-bottom:8px"><div class="row" style="gap:8px;align-items:center"><b style="font-size:16px;flex:1">${h([v.veiculo,v.placa].filter(Boolean).join(" · ")||"Veículo "+(i+1))}</b><button class="btn" data-cv="${i}" style="min-height:40px">📋 Copiar</button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px">${CAMPOS_VEIC.map(([k,t])=>`<div style="${k==="avarias"||k==="chassi"||k==="bateria"?"grid-column:1/-1":""}"><div class="muted" style="font-size:11px;text-transform:uppercase">${t}</div><div style="font-size:15px;user-select:text;${v[k]?"cursor:copy":""}" ${v[k]?"data-cp=\"1\"":""}>${v[k]?h(v[k]):`<span class="muted">—</span>`}</div></div>`).join("")}</div>
+      ${v.notas.length||v.os.length?`<div class="muted" style="font-size:13px;margin-top:6px">${v.notas.length?"Notas: "+v.notas.join(", "):""}${v.notas.length&&v.os.length?" · ":""}${v.os.length?"OS: "+v.os.join(", "):""}</div>`:""}</div>`).join(""):`<div class="muted">Nenhum veículo.</div>`}
+    <h3 style="margin:12px 0 4px">🚗 Notas de apanha (${ns.length})</h3>${ns.length?ns.map(a=>`<div class="card click" data-hn="${a.id}" style="padding:8px 12px;margin-bottom:6px;cursor:pointer"><b class="mono">${codNA(a)}</b> · ${dt(a.em)} · ${h(a.veiculo||"")} ${h(a.placa||"")}<br><span class="muted">${h(a.servicoAutorizado||"")}${a.desmontagem?" · "+money(a.desmontagem):""} · ${a.assinatura?(a.assinatura.remota?"✅ assinada pelo link":"✅ assinada na tela"):a.assinadoPapel?"✅ assinou o papel":"✍️ sem assinatura"}</span>${a.assinatura&&a.assinatura.img?`<br><img src="${a.assinatura.img}" alt="Assinatura" style="max-height:44px;background:#fff;border-radius:6px;padding:2px 8px;margin-top:4px">`:""}${(a.fotos||[]).length?`<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${a.fotos.slice(0,6).map(f=>`<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(f.id)}" alt="Foto" style="width:52px;height:52px;object-fit:cover;border-radius:6px">`).join("")}</div>`:""}</div>`).join(""):`<div class="muted">Nenhuma.</div>`}
+    ${SEM_OS()?"":`<h3 style="margin:12px 0 4px">🔧 Ordens de serviço (${os.length})</h3>`}${SEM_OS()?"":os.length?os.map(o=>`<div class="card" style="padding:8px 12px;margin-bottom:6px"><b class="mono">${codOS(o)}</b> · ${dt(o.criadoEm||0)} · ${h(STATUS[o.status]?.t||o.status||"")}<br><span class="muted">${h([o.veiculo,o.placa,o.motor].filter(Boolean).join(" · "))}</span>${(o.servicos||[]).length?`<div style="font-size:14px;margin-top:3px">${(o.servicos||[]).map(x=>h(x.desc)).join(", ")}</div>`:""}<div style="font-size:14px"><b>Total: ${money(totalOS(o))}</b></div>${todasAss(o).concat(o.assinaturaApanha&&o.assinaturaApanha.img?[o.assinaturaApanha]:[]).map((a,i)=>`<div data-ha="${o.id}|${i}" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:var(--surface-2);cursor:zoom-in"><div style="font-size:13px">✍️ ${a===o.aprovacaoRemota||(o.aprovacoes||[]).some(x=>x.assinatura===a)?"<b>Aprovou o orçamento</b>":a===o.assinaturaApanha?"<b>Autorizou na entrada</b>":"<b>Assinou</b>"} · ${h(a.nome||"")}${a.doc?" · "+h(a.doc):""} · ${dt(a.em)}${a.valor!=null?" · "+money(a.valor):""}${a.remota?" · pelo link":""}</div><img src="${a.img}" alt="Assinatura" style="max-height:50px;background:#fff;border-radius:6px;padding:2px 8px;margin-top:3px"></div>`).join("")}</div>`).join(""):`<div class="muted">Nenhuma.</div>`}
+    <div class="acts"><button class="btn" id="hc-x">Fechar</button></div>`, m=>{ $("#hc-x",m).onclick=fecharModal;
+    $("#hc-cp",m).onclick=async()=>{ const t=textoCliente(c); try{ await navigator.clipboard.writeText(t); toast("📋 Dados copiados. Agora é só colar no outro sistema."); }catch(e){ const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); toast("📋 Dados copiados."); }catch(_){ toast("Não deu para copiar. Segure o dedo no texto para copiar."); } ta.remove(); } };
+    m.addEventListener("click", async e=>{ const cp=e.target.closest("[data-cp]"); if (cp){ const t=cp.textContent.trim(); try{ await navigator.clipboard.writeText(t); }catch(_){ const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); }catch(__){} ta.remove(); } cp.style.background="var(--ok)"; cp.style.color="#fff"; setTimeout(()=>{ cp.style.background=""; cp.style.color=""; },500); toast("📋 Copiado: "+t.slice(0,40)); return; }
+      const ha=e.target.closest("[data-ha]"); if (ha){ const [oid,ix]=ha.dataset.ha.split("|"), o=S.os.find(x=>x.id===oid); if (o){ const L=todasAss(o).concat(o.assinaturaApanha&&o.assinaturaApanha.img?[o.assinaturaApanha]:[]); fecharModal(); setTimeout(()=>ampliarAss(o, L[+ix]),120); } return; }
+      const cv=e.target.closest("[data-cv]"); if (cv){ const t=textoVeiculo(V[+cv.dataset.cv]); try{ await navigator.clipboard.writeText(t); toast("📋 Dados do veículo copiados"); }catch(_){ const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); toast("📋 Copiado"); }catch(__){ toast("Segure o dedo no texto para copiar."); } ta.remove(); } return; }
+      const b=e.target.closest("[data-hn]"); if(!b) return; const a=S.apanhas.find(x=>x.id===b.dataset.hn); if (a){ fecharModal(); setTimeout(()=>verNotaApanha(a),120); } }); }); }
+function textoApanha(a, quem){ const L=v=>APANHA_ITENS.filter(x=>(a.itens||{})[x]===v);
+  return [`🚗 NOTA DE APANHA${quem?` · recebido por ${quem}`:""}`,
+    `KM: ${a.km||"—"} · Cor: ${a.cor||"—"} · Ano: ${a.ano||"—"} · Chassi: ${a.chassi||"—"}`,
+    `🔋 Bateria: ${a.bateria||"—"}`,
+    `Combustível: ${a.comb||"—"} · Pneus: ${a.pneus||"—"}`,
+    `✅ Tem (S): ${L("S").join(", ")||"—"}`,
+    `➖ Não tem (N): ${L("N").join(", ")||"—"}`,
+    `⚠️ Avariado/incompleto (A): ${L("A").join(", ")||"—"}`,
+    `Lataria com avaria: ${(a.avarias||[]).join(", ")||"nenhuma"}`,
+    ...(a.compl?[`Serviços complementares / como chegou: ${a.compl}`]:[]), ...(a.obs?[`Observações: ${a.obs}`]:[])].join("\n"); }
+const TERMO_APANHA = `ATENÇÃO: A EMPRESA NÃO SE RESPONSABILIZA POR ARMAS, JOIAS, PEÇAS OU QUALQUER TIPO DE MATERIAL QUE NÃO TENHA SIDO DEVIDAMENTE RECONHECIDO OU CITADO PELO CLIENTE DURANTE A ENTREGA DO VEÍCULO EM NOSSA OFICINA.`;
 const ENT_ITENS = ["Bloco","Cabeçote","Virabrequim","Bielas","Pistões","Comando de válvulas","Volante","Bomba de óleo","Bomba d'água","Cárter","Tampa de válvulas","Coletor de admissão","Coletor de escape","Turbina","Bicos injetores","Bomba injetora","Polias","Motor de partida","Alternador","Parafusos"];
 const ENT_ESTADO = ["Motor montado","Motor desmontado","Peças soltas em caixa","Com óleo","Sem óleo","Peça quebrada ou trincada à vista"];
 function formEntrada(o){
@@ -3478,6 +3793,99 @@ function htmlEntradaImp(o){
   <div class="assin"><div>Cliente · data ____/____/______</div><div>Retífica</div></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`;
 }
+/* ===== OS COMPLETA EM FOLHA A3 (tudo da OS numa folha grande) ===== */
+function htmlOSA3(o){
+  const c=cliDaOS(o)||{}, E=(c.endereco&&typeof c.endereco==="object")?c.endereco:{}, e=o.entrada||{itens:[],estado:[]}, sel=new Set(e.itens||[]), est=new Set(e.estado||[]), a=assinaturaOS(o);
+  const end=[E.rua, E.numero, E.bairro, E.cidade&&(E.cidade+(E.uf?"/"+E.uf:"")), E.cep&&("CEP "+E.cep)].filter(Boolean).join(", ");
+  const pagos=pagosReais(o.pagamentos||[]), pago=pagos.reduce((t,p)=>t+(Number(p.valor)||0),0), tot=totalOS(o);
+  const pecasMot=(o.pecasMotor||[]).length ? (o.pecasMotor||[]).map(p=>`${h(p.nome||p)}${p.qtd>1?" ×"+p.qtd:""}`).join(" · ") : "";
+  const cart = (c.veiculos||[]).find(v=>v.placa && o.placa && v.placa===o.placa) || {};
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>OS ${h(codOS(o))} · A3</title><style>
+  @page{size:A3 portrait;margin:14mm} *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact} body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0;font-size:15px;line-height:1.3}
+  header{display:flex;justify-content:space-between;align-items:center;border-bottom:6px solid #f97316;padding-bottom:8px;margin-bottom:10px} h1{font-size:34px;margin:0} .num{font-size:44px;font-weight:900;font-family:monospace;border:4px solid #000;padding:4px 14px;border-radius:8px}
+  h2{font-size:19px;margin:12px 0 6px;background:#111;color:#fff;padding:4px 10px;border-radius:4px} .g{display:grid;gap:6px 18px} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  .g b{display:block;font-size:12px;text-transform:uppercase;color:#555;letter-spacing:.04em} .g div{font-size:16px;padding:3px 0;border-bottom:1px dotted #999;min-height:26px}
+  table{width:100%;border-collapse:collapse;font-size:16px} th{background:#eee;text-align:left;padding:5px 7px;border:1px solid #999} td{padding:5px 7px;border:1px solid #999} td.n,th.n{text-align:right;white-space:nowrap}
+  .tot{display:flex;justify-content:flex-end;gap:30px;font-size:19px;margin-top:8px} .tot b{font-size:26px} .cols{columns:5;column-gap:14px} .it{break-inside:avoid;padding:1px 0;font-size:14px}
+  .bx{display:inline-block;width:16px;height:16px;border:2px solid #000;margin-right:6px;vertical-align:-3px;text-align:center;line-height:12px;font-weight:900} .obs{border:1px solid #000;min-height:60px;padding:8px;white-space:pre-wrap}
+  .assin{display:flex;gap:50px;margin-top:24px} .assin div{flex:1;border-top:2px solid #000;padding-top:6px;text-align:center;font-size:14px} .termo{font-size:13px;color:#333} .pill{display:inline-block;border:2px solid #000;border-radius:20px;padding:2px 12px;font-weight:700;font-size:16px}
+  .manuscrito{height:34px;border-bottom:1px solid #000}</style></head><body>
+  <header><div>${logoImpr()}<div style="margin-top:6px;font-size:15px">${h(nomeEmp())}</div></div><div style="text-align:center"><h1>${o.status==="orcamento"?"ORÇAMENTO":"ORDEM DE SERVIÇO"}</h1><span class="pill">${h(o.status==="orcamento"?"para aprovação do cliente":(STATUS[o.status]?.t||o.status))}</span></div><div class="num">${h(codOS(o))}</div></header>
+  <div class="g g4"><div><b>Entrada</b>${dt(o.criadoEm)}</div><div><b>Previsão de entrega</b>${o.previsao?dia(o.previsao):"—"}</div><div><b>Aberta por</b>${h(o.criadoPorNome||"—")}</div><div><b>Linha</b>${h(nomeLinha(o.linha))}</div></div>
+  <h2>👤 Cliente</h2><div class="g g3"><div><b>Nome</b>${h(o.cliente||"—")}</div><div><b>${c.pessoa==="J"||String(c.doc||"").replace(/\D/g,"").length===14?"CNPJ":"CPF"}</b>${h(c.doc||"—")}</div><div><b>Telefone / WhatsApp</b>${h(o.telefone||c.telefone||"—")}</div><div style="grid-column:1/-1"><b>Endereço</b>${h(end||"—")}${E.comp?" · "+h(E.comp):""}</div></div>
+  <h2>🚗 Veículo e motor</h2><div class="g g4"><div><b>Veículo</b>${h(o.veiculo||"—")}</div><div><b>Placa</b>${h(o.placa||"—")}</div><div><b>Ano</b>${h(cart.ano||"—")}</div><div><b>Motor</b>${h(o.motor||"—")}</div><div><b>Nº do motor</b>${h(o.numMotor||"—")}</div><div style="grid-column:span 3"><b>Peças que vieram</b>${pecasMot||h(o.pecaSolta||"Motor")}</div>
+    <div style="grid-column:1/-1"><b>O que o cliente reclamou / pediu</b>${h(o.problema||"—")}</div></div>
+  ${o.apanha?`<p style="font-size:16px;margin:8px 0"><b>🚗 Veio pela Nota de apanha${o.apanhaNum?" NA-"+String(o.apanhaNum).padStart(4,"0"):""}:</b> KM ${h(o.apanha.km||"")} · combustível ${h(o.apanha.comb||"")} · pneus ${h(o.apanha.pneus||"")}${(o.apanha.avarias||[]).length?" · lataria: "+h(o.apanha.avarias.join(", ")):""}</p>`:`<h2>📋 Entrada (o que veio e como chegou)</h2><div class="cols">${ENT_ITENS.map(x=>`<div class="it"><span class="bx">${sel.has(x)?"X":""}</span>${h(x)}</div>`).join("")}</div>
+  <div class="cols" style="margin-top:6px">${ENT_ESTADO.map(x=>`<div class="it"><span class="bx">${est.has(x)?"X":""}</span>${h(x)}</div>`).join("")}</div>`}
+  ${e.outros?`<p><b>Outras peças:</b> ${h(e.outros)}</p>`:""}${e.pecasCliente?`<p><b>Peças novas trazidas pelo cliente:</b> ${h(e.pecasCliente)} <span class="termo">(sem garantia da retífica)</span></p>`:""}
+  <h2>🔧 Serviços</h2>${(o.servicos||[]).length?`<table><tr><th>Serviço</th><th class="n">Qtd</th><th class="n">Valor</th><th class="n">Total</th></tr>${o.servicos.map(x=>`<tr><td>${h(x.desc)}</td><td class="n">${x.qtd||1}</td><td class="n">${money(x.valor)}</td><td class="n">${money(sTot(x))}</td></tr>`).join("")}</table>`:`<div class="obs" style="min-height:150px">${o.avaliacao?"Em avaliação. Serviços a definir:":""}</div>`}
+  <h2>🔩 Peças</h2>${(o.pecas||[]).length?`<table><tr><th>Peça</th><th class="n">Qtd</th><th class="n">Valor</th><th class="n">Total</th></tr>${o.pecas.map(x=>`<tr><td>${h(x.nome)}${x.semBaixa&&!x.pecaId?" (comprar)":""}</td><td class="n">${x.qtd}</td><td class="n">${money(x.preco)}</td><td class="n">${money(x.qtd*x.preco)}</td></tr>`).join("")}</table>`:`<div class="obs" style="min-height:80px"></div>`}
+  <div class="tot"><span>Mão de obra: ${money(totalServ(o))}</span><span>Peças: ${money(totalPecas(o))}</span>${o.desconto?`<span>Desconto: −${money(o.desconto)}</span>`:""}<span>TOTAL: <b>${money(tot)}</b></span></div>
+  ${pagos.length?`<div class="tot" style="font-size:16px"><span>Pago: ${money(pago)}</span><span>Falta: <b style="font-size:20px">${money(Math.max(0,tot-pago))}</b></span></div>`:""}
+  <h2>📝 Observações da oficina</h2><div class="obs" style="min-height:60px">${h(e.obs||"")}</div>
+  <h2>✍️ Aprovação do cliente</h2>${o.status==="orcamento"?`<div style="font-size:18px;margin:4px 0 8px"><span class="bx"></span> <b>APROVO</b> o orçamento acima &nbsp;&nbsp;&nbsp; <span class="bx"></span> <b>NÃO APROVO</b> &nbsp;&nbsp;&nbsp; Validade do orçamento: 7 dias</div>`:""}${o.apanhaNum?`<p class="termo">Veículo recebido pela Nota de apanha NA-${String(o.apanhaNum).padStart(4,"0")}.</p>`:""}<p class="termo">${h(termoAprovacao(o, tot, o.previsao))}</p>
+  <div class="assin"><div>${a?`<img src="${a.img}" alt="Assinatura" style="max-height:80px;max-width:90%;display:block;margin:0 auto 4px">`:""}Cliente: ${h(a?a.nome:o.cliente||"")}${a&&a.doc?" · "+h(a.doc):""}${a?`<br><small>assinado ${a.remota?"pelo link do WhatsApp ":""}em ${dt(a.em)}</small>`:""}</div><div>${h(nomeEmp())}</div><div>📦 Retirada: recebi conferido<br>Cliente · ____/____/______</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>`; }
+/* ===== DUAS VIAS EM A3: oficina (marcar X, sem preços) e cliente (comprovante de entrada) ===== */
+const CSS_A3 = `@page{size:A3 portrait;margin:14mm} *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact} body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0;font-size:16px;line-height:1.3}
+  header{display:flex;justify-content:space-between;align-items:center;border-bottom:6px solid #f97316;padding-bottom:8px;margin-bottom:10px} h1{font-size:32px;margin:0} .num{font-size:52px;font-weight:900;font-family:monospace;border:5px solid #000;padding:2px 16px;border-radius:8px}
+  h2{font-size:19px;margin:10px 0 5px;background:#111;color:#fff;padding:4px 10px;border-radius:4px} .g{display:grid;gap:4px 18px} .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  .g b{display:block;font-size:12px;text-transform:uppercase;color:#555;letter-spacing:.04em} .g div{font-size:17px;padding:2px 0;border-bottom:1px dotted #999;min-height:24px}
+  .cols{columns:4;column-gap:16px} .it{break-inside:avoid;padding:5px 0;font-size:18px} .bx{display:inline-block;width:22px;height:22px;border:2.5px solid #000;margin-right:8px;vertical-align:-5px;text-align:center;line-height:18px;font-weight:900;font-size:18px}
+  table{width:100%;border-collapse:collapse;font-size:17px} th{background:#eee;text-align:left;padding:6px 8px;border:1px solid #777} td{padding:0 8px;border:1px solid #777;height:33px}
+  .obs{border:1.5px solid #000;padding:8px;white-space:pre-wrap} .linha{border-bottom:1px solid #000;height:34px} .termo{font-size:14px;color:#222}
+  .assin{display:flex;gap:50px;margin-top:30px} .assin div{flex:1;border-top:2px solid #000;padding-top:6px;text-align:center;font-size:15px} .tag{display:inline-block;background:#f97316;color:#fff;font-weight:900;padding:4px 14px;border-radius:6px;font-size:20px;letter-spacing:.05em}`;
+function cabA3(o, via, titulo){ return `<header><div>${logoImpr()}<div style="margin-top:4px;font-size:14px">${h(nomeEmp())}</div></div><div style="text-align:center"><h1>${h(titulo)}</h1><span class="tag">${h(via)}</span></div><div class="num">${h(o.__cod||codOS(o))}</div></header>`; }
+const pecasVieram = o => (o.pecasMotor||[]).length ? (o.pecasMotor||[]).map(p=>`${h(p.nome||p)}${p.qtd>1?" ×"+p.qtd:""}`).join(" · ") : h(o.pecaSolta||"Motor");
+function osDaNota(a){ return {__cod:codNA(a), numero:"NA"+a.numero, clienteId:a.clienteId, cliente:a.cliente, telefone:a.telefone, veiculo:a.veiculo, placa:a.placa, motor:a.motor, numMotor:a.numMotor, linha:a.linha, problema:a.servicosSolicitados, criadoEm:a.em, criadoPorNome:a.porNome, previsao:"", servicos:[], pecas:[], apanha:Object.assign({}, a.vistoria, {porNome:a.porNome, em:a.em}), prioridade:"normal"}; }
+const imprimirOficinaNota = a => folhaParaImprimir("Via da oficina · "+codNA(a), `nota-${a.numero}-oficina-A3.html`, htmlA3Oficina(osDaNota(a)));
+function htmlA3Oficina(o){ const sv=o.servicos||[], pc=o.pecas||[], pri=(cliDaOS(o)||{}).prioritario;
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${h(o.__cod||("OS "+codOS(o)))} · via da oficina</title><style>${CSS_A3}</style></head><body>
+  ${cabA3(o, "VIA DA OFICINA", "ORDEM DE SERVIÇO")}
+  <div class="g g4"><div><b>Entrada</b>${dt(o.criadoEm)}</div><div><b>Previsão</b>${o.previsao?dia(o.previsao):"—"}</div><div><b>Linha</b>${h(nomeLinha(o.linha))}</div><div><b>Prioridade</b>${pri?"⭐ Cliente prioritário":o.prioridade==="urgente"?"URGENTE":"Normal"}</div></div>
+  <div class="g g4" style="margin-top:6px"><div><b>Cliente</b>${h(o.cliente||"—")}</div><div><b>Veículo / placa</b>${h(o.veiculo||"—")} ${h(o.placa||"")}</div><div><b>Motor</b>${h(o.motor||"—")}</div><div><b>Nº do motor</b>${h(o.numMotor||"—")}</div>
+    <div style="grid-column:1/-1"><b>Peças que vieram</b>${pecasVieram(o)}</div><div style="grid-column:1/-1"><b>Reclamação do cliente</b>${h(o.problema||"—")}</div>${o.apanha?`<div style="grid-column:1/-1"><b>🚗 Carro fechado (nota de apanha)</b>KM ${h(o.apanha.km)} · ⛽ ${h(o.apanha.comb)} · pneus ${h(o.apanha.pneus)}${(o.apanha.avarias||[]).length?" · lataria: "+h(o.apanha.avarias.join(", ")):""}${o.apanha.compl?" · "+h(o.apanha.compl):""}</div>`:""}</div>
+  <h2>📋 O que veio com o motor · marque X</h2><div class="cols">${ENT_ITENS.map(x=>`<div class="it"><span class="bx"></span>${h(x)}</div>`).join("")}</div>
+  <div style="margin-top:4px;font-size:17px">Outros: <span style="display:inline-block;width:80%;border-bottom:1px solid #000">&nbsp;</span></div>
+  <h2>🔎 Como chegou · marque X</h2><div class="cols">${ENT_ESTADO.map(x=>`<div class="it"><span class="bx"></span>${h(x)}</div>`).join("")}</div>
+  <h2>🔧 Serviços a fazer ${sv.length?"· marque X quando terminar":"· anote o que o motor precisa"}</h2>
+  <table><tr><th style="width:56px">Feito</th><th>Serviço</th><th style="width:90px">Qtd</th><th style="width:220px">Quem fez</th></tr>${sv.map(x=>`<tr><td style="text-align:center"><span class="bx" style="margin:0"></span></td><td>${h(x.desc)}</td><td style="text-align:center">${x.qtd||1}</td><td></td></tr>`).join("")}${Array.from({length:Math.max(2, 7-sv.length)},()=>`<tr><td style="text-align:center"><span class="bx" style="margin:0"></span></td><td></td><td></td><td></td></tr>`).join("")}</table>
+  <h2>🔩 Peças que precisa</h2><table><tr><th>Peça</th><th style="width:90px">Qtd</th><th style="width:220px">Medida / obs.</th></tr>${pc.map(x=>`<tr><td>${h(x.nome)}</td><td style="text-align:center">${x.qtd}</td><td></td></tr>`).join("")}${Array.from({length:Math.max(2, 4-pc.length)},()=>`<tr><td></td><td></td><td></td></tr>`).join("")}</table>
+  <div class="assin"><div>Conferido por (oficina)</div><div>Data ____/____/______</div></div>
+  <div style="break-before:page;page-break-before:always"></div>
+  <header style="margin-top:0"><div><h1 style="font-size:28px">✍️ Anotações do mecânico</h1><div style="font-size:16px">${h(o.cliente||"")} · ${h(o.motor||"")} ${o.numMotor?"· nº "+h(o.numMotor):""}</div></div><div class="num" style="font-size:40px">${h(codOS(o))}</div></header>
+  <h2>📏 Medidas</h2><table><tr><th style="width:34%">Peça / ponto medido</th><th>Medida padrão</th><th>Medida encontrada</th><th>Resultado / o que fazer</th></tr>${["Cilindros","Munhões (virabrequim)","Moentes (virabrequim)","Mancais","Cabeçote (planicidade)","Bloco (planicidade)","Comando","Folga de válvulas"].map(x=>`<tr><td>${x}</td><td></td><td></td><td></td></tr>`).join("")}${Array.from({length:4},()=>`<tr><td></td><td></td><td></td><td></td></tr>`).join("")}</table>
+  <h2>🔎 O que foi encontrado no motor (trincas, desgastes, peças danificadas)</h2>${Array.from({length:9},()=>`<div class="linha"></div>`).join("")}
+  <h2>📝 Anotações livres</h2>${Array.from({length:12},()=>`<div class="linha"></div>`).join("")}
+  <div class="assin"><div>Mecânico</div><div>Data ____/____/______</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>`; }
+function htmlA3Cliente(o){ const c=cliDaOS(o)||{}, E=(c.endereco&&typeof c.endereco==="object")?c.endereco:{}, e=o.entrada||{itens:[],estado:[]}, sel=new Set(e.itens||[]), est=new Set(e.estado||[]), a=assinaturaOS(o);
+  const end=[E.rua, E.numero, E.bairro, E.cidade&&(E.cidade+(E.uf?"/"+E.uf:"")), E.cep&&("CEP "+E.cep)].filter(Boolean).join(", "), cnpj=c.pessoa==="J"||String(c.doc||"").replace(/\D/g,"").length===14;
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>OS ${h(codOS(o))} · comprovante de entrada</title><style>${CSS_A3}</style></head><body>
+  ${cabA3(o, "VIA DO CLIENTE", "COMPROVANTE DE ENTRADA")}
+  <div class="g g3"><div><b>Data da entrada</b>${dt(o.criadoEm)}</div><div><b>Previsão</b>${o.previsao?dia(o.previsao):"a definir após a avaliação"}</div><div><b>Atendido por</b>${h(o.criadoPorNome||"—")}</div></div>
+  <h2>👤 Cliente</h2><div class="g g3"><div><b>Nome</b>${h(o.cliente||"—")}</div><div><b>${cnpj?"CNPJ":"CPF"}</b>${h(c.doc||"—")}</div><div><b>Telefone / WhatsApp</b>${h(o.telefone||c.telefone||"—")}</div><div style="grid-column:1/-1"><b>Endereço</b>${h(end||"—")}${E.comp?" · "+h(E.comp):""}</div></div>
+  <h2>🚗 Veículo e motor</h2><div class="g g4"><div><b>Veículo</b>${h(o.veiculo||"—")}</div><div><b>Placa</b>${h(o.placa||"—")}</div><div><b>Motor</b>${h(o.motor||"—")}</div><div><b>Nº do motor</b>${h(o.numMotor||"—")}</div>
+    <div style="grid-column:1/-1"><b>Peças entregues</b>${pecasVieram(o)}</div><div style="grid-column:1/-1"><b>O que o cliente relatou</b>${h(o.problema||"—")}</div></div>
+  ${o.apanha ? `<h2>🚗 Nota de apanha · vistoria do veículo</h2>${htmlApanhaImp(o.apanha)}` : `<h2>📋 O que foi deixado na retífica</h2><div class="cols">${ENT_ITENS.map(x=>`<div class="it"><span class="bx">${sel.has(x)?"X":""}</span>${h(x)}</div>`).join("")}</div>
+  ${e.outros?`<p style="font-size:17px"><b>Outras peças:</b> ${h(e.outros)}</p>`:""}${e.pecasCliente?`<p style="font-size:17px"><b>Peças novas trazidas pelo cliente:</b> ${h(e.pecasCliente)} <span class="termo">(peças do cliente não têm garantia da retífica)</span></p>`:""}
+  <h2>🔎 Como chegou</h2><div class="cols">${ENT_ESTADO.map(x=>`<div class="it"><span class="bx">${est.has(x)?"X":""}</span>${h(x)}</div>`).join("")}</div>
+  ${e.obs?`<p style="font-size:17px"><b>Observações:</b> ${h(e.obs)}</p>`:""}`}
+  ${o.apanha?`<p style="font-size:15px;margin:10px 0 0">ℹ️ A oficina avalia, mandamos o <b>orçamento pelo WhatsApp</b> (com link para aprovar e assinar) e só começamos <b>depois da sua aprovação</b>. Guarde o número da OS: <b>${h(codOS(o))}</b>.</p>`:`<h2>ℹ️ Como funciona daqui pra frente</h2><div style="font-size:18px;line-height:1.6">1. A oficina avalia o motor.<br>2. Mandamos o <b>orçamento pelo WhatsApp</b>, com um link para você aprovar e assinar pelo celular.<br>3. Só começamos o serviço <b>depois da sua aprovação</b>.<br>4. Avisamos pelo WhatsApp quando estiver pronto. Guarde este comprovante e o número da OS: <b>${h(codOS(o))}</b>.</div>`}
+  ${o.apanha?`<p style="font-size:14px;font-weight:700;margin-top:12px">${h(TERMO_APANHA)}</p><p class="termo">Autorizo a ${h(nomeEmp())} a consultar o meu cadastro junto aos órgãos competentes, como SPC e Serasa, bem como executar os serviços necessários acima descritos.</p>`:`<p class="termo" style="margin-top:14px">O cliente confirma que entregou somente os itens marcados acima; peças não marcadas não ficaram na retífica. Motor/peças prontos devem ser retirados em até 90 dias após o aviso.</p>`}
+  ${o.apanha?`<div class="g g3" style="margin-top:8px"><div><b>Recebido por</b>${h(o.apanha.porNome||"")}</div><div><b>Data da entrada</b>${dt(o.apanha.em)}</div><div><b>Data da saída</b>____/____/______</div></div>`:""}
+  <div class="assin"><div>${a?`<img src="${a.img}" alt="Assinatura" style="max-height:70px;max-width:90%;display:block;margin:0 auto 4px">`:""}Cliente: ${h(a?a.nome:(e.trouxe||o.cliente||""))}</div><div>${h(nomeEmp())}</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>`; }
+function menuImprimir(o){ if (!o) return; const bt="width:100%;justify-content:flex-start;min-height:60px;font-size:17px;text-align:left;margin-bottom:8px";
+  abrirModal(`<h2>🖨 Imprimir · OS ${codOS(o)}</h2>
+    <button class="btn pri" data-v="ofi" style="${bt}">🔧 Via da oficina<br><small style="font-weight:400">A3 · o mecânico marca X no que veio e nos serviços · sem preços</small></button>
+    <button class="btn" data-v="cli" style="${bt}">👤 Via do cliente<br><small style="font-weight:400">A3 · comprovante de entrada para o cliente levar</small></button>
+    <button class="btn ${o.status==="orcamento"?"pri":""}" data-v="tudo" style="${bt}">📄 ${o.status==="orcamento"?"Orçamento para o cliente assinar":"OS completa com valores"}<br><small style="font-weight:400">A3 · serviços, peças, total${o.status==="orcamento"?", APROVO / NÃO APROVO":""} e assinatura</small></button>
+    <button class="btn" data-v="pdf" style="${bt};background:#1fa855;border-color:#1fa855;color:#fff">📲 Enviar ${o.status==="orcamento"?"o orçamento":"a OS"} em PDF pelo WhatsApp<br><small style="font-weight:400">o cliente abre no celular, fácil de ler</small></button>
+    <button class="btn" data-v="etq" style="${bt}">🏷 Etiqueta da peça/motor</button>
+    <div class="acts"><button class="btn" id="mi-x">Fechar</button></div>`, m=>{ $("#mi-x",m).onclick=fecharModal;
+    m.addEventListener("click", e=>{ const b=e.target.closest("[data-v]"); if(!b) return; const v=b.dataset.v; fecharModal(); setTimeout(()=>{ if (v==="etq") imprimirEtiqueta(o); else if (v==="pdf") enviarPdfOrcamento(o); else imprimirVia(o, v); }, 150); }); }); }
+function imprimirVia(o, via){ via==="cli" ? folhaParaImprimir("Comprovante de entrada (cliente) · "+codOS(o), `os-${o.numero}-cliente-A3.html`, htmlA3Cliente(o)) : via==="ofi" ? folhaParaImprimir("Via da oficina · "+codOS(o), `os-${o.numero}-oficina-A3.html`, htmlA3Oficina(o)) : folhaParaImprimir("OS completa A3 · "+codOS(o), `os-${o.numero}-A3.html`, htmlOSA3(o)); }
 function htmlEtiqueta(o, lista){
   const peca = o.pecaSolta || o.motor || "";
   const etqs = lista || [{cod:codOS(o), txt:peca},{cod:codOS(o), txt:peca}];
@@ -3503,7 +3911,7 @@ async function folhaParaImprimir(titulo, nomeArq, html){
     <div class="acts"><button class="btn" id="fo-x">Fechar</button><button class="btn pri" id="fo-ok">${dl?"Baixar e imprimir":"Imprimir"}</button></div>`, m=>{
     const fr=$("#fo-pv",m); fr.srcdoc = html.replace(/<script>[\s\S]*?<\/script>/,"");
     $("#fo-x",m).onclick=fecharModal;
-    $("#fo-ok",m).onclick=async()=>{ try{ if (dl){ await dl.save({filename:nomeArq, data:html}); toast("Arquivo baixado. Abra ele para imprimir."); } else fr.contentWindow.print(); fecharModal(); }catch(err){ toast(err&&err.code==="declined"?"Download cancelado.":"Não foi possível agora. Tente de novo."); } };
+    $("#fo-ok",m).onclick=async()=>{ try{ if (!dl && (matchMedia("(pointer:coarse)").matches || innerWidth<760)){ const u=URL.createObjectURL(new Blob([html],{type:"text/html"})); const w=window.open(u,"_blank"); if (!w){ location.href=u; } fecharModal(); return; } if (dl){ await dl.save({filename:nomeArq, data:html}); toast("Arquivo baixado. Abra ele para imprimir."); } else fr.contentWindow.print(); fecharModal(); }catch(err){ toast(err&&err.code==="declined"?"Download cancelado.":"Não foi possível agora. Tente de novo."); } };
   });
 }
 /* acha a assinatura que pertence a uma linha do histórico (mesmo momento, até 15 min) */
@@ -3511,10 +3919,11 @@ function todasAss(o){ return (o.aprovacoes||[]).filter(a=>a.assinatura).map(a=>a
 /* histórico com cada rubrica do cliente como uma linha própria (sem repetir a mesma) */
 function histComAss(o){ const vis=new Set(), L=(o.hist||[]).slice();
   todasAss(o).forEach(a=>{ const k=a.img.slice(-60)+"|"+a.nome; if (vis.has(k)) return; vis.add(k); L.push({em:(a.em||0)+1, __ass:a}); });
+  if (o.assinaturaApanha && o.assinaturaApanha.img) L.push({em:(o.assinaturaApanha.em||0)+1, __ass:o.assinaturaApanha, __rot:`Autorização na entrada: ${o.servicoAutorizadoNota||"serviço"} (nota de apanha${o.apanhaNum?" NA-"+String(o.apanhaNum).padStart(4,"0"):""}) · ${money(o.desmontagemNota||0)}`});
   return L.sort((x,y)=>(x.em||0)-(y.em||0)); }
 const imgAss = (o, a, alt) => `<img class="ass-zoom" data-aso="${h(o.id)}" data-ase="${h(String(a.em||0))}" src="${a.img}" alt="Rubrica do cliente" title="Toque para ampliar" style="cursor:zoom-in;max-height:${alt||46}px;max-width:240px;background:#fff;border-radius:6px;padding:3px 8px">`;
 function ampliarAss(o, a){
-  abrirModal(`<h2>✍️ Rubrica do cliente · OS ${codOS(o)}</h2>
+  abrirModal(`<h2>✍️ Rubrica do cliente · ${o.__rot||"OS "+codOS(o)}</h2>
     <div style="background:#fff;border-radius:12px;padding:16px;text-align:center"><img src="${a.img}" alt="Rubrica" style="width:100%;max-width:640px;height:auto;image-rendering:auto"></div>
     <div style="font-size:15px"><b>${h(a.nome)}</b>${a.doc?` · CPF ${h(a.doc)}`:""}<br>Assinou em ${dt(a.em)}${a.remota?" · pelo link do WhatsApp":a.colhidaPorNome?" · colhida por "+h(a.colhidaPorNome):""}${a.valor!=null?`<br>Valor: <b>${money(a.valor)}</b>`:""}</div>
     ${a.termo?`<details><summary class="muted">Ver o termo que ele assinou</summary><p style="font-size:13px;font-style:italic;white-space:pre-wrap">${h(a.termo)}</p></details>`:""}
@@ -3529,6 +3938,7 @@ function htmlAssCard(o){
     return `<div class="card" style="padding:10px 14px;border-color:var(--ok);display:flex;gap:12px;align-items:center;flex-wrap:wrap"><b style="color:var(--ok)">✅ Cliente APROVOU e assinou pelo WhatsApp</b>${imgAss(o, ar)}<span class="muted" style="font-size:13px">${h(ar.nome)} · ${dt(ar.em)} · ${money(ar.valor)}</span>${mudou?`<span class="pill p-cancelada">o valor da OS mudou depois: mande o link de novo</span>`:""}<span class="spacer"></span>${(direcao()||ehLojista())&&!mudou?`<button class="btn sm pri" data-en="apr">✅ Lançar a OS</button>`:""}</div>`; }
   if (o.status==="orcamento"){ const e=estadoAss(o), pode=direcao()||ehLojista(); if (!e) return "";
     const cor=e.k==="vencido"?"var(--bad)":e.k==="esperando"?"var(--warn)":"var(--line)";
+    if (e.k==="aval") return `<div class="card" style="padding:10px 14px;border-color:var(--warn)"><b style="color:var(--warn)">🔎 Em avaliação: ainda não tem orçamento</b><div class="muted" style="font-size:14px;margin-top:4px">A entrada do motor foi registrada${o.avaliacao?` em ${dt(o.avaliacao.em)}`:""}. Quando a oficina disser o que precisa: <b>1.</b> toque em <b>＋ Adicionar serviços</b> (e peças, se tiver) · <b>2.</b> 🖨 <b>Imprimir → Orçamento (A3)</b> para o cliente assinar no papel · ou 💬 WhatsApp → <b>Orçamento</b> (com o link para assinar pelo celular).</div></div>`;
     return `<div class="card" style="padding:10px 14px;border-color:${cor};display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:${cor==="var(--line)"?"inherit":cor}">${h(e.t)}</b><span class="muted" style="font-size:13px">${h(e.s)}</span><span class="spacer"></span>${pode?`<button class="btn sm${e.k==="nao"?"":" pri"}" data-en="asz">${e.k==="nao"?"📲 Mandar link para aprovar":"🔁 Mandar link de novo"}</button>`:""}</div>`; }
   if (!(o.aprovacoes||[]).length) return ""; const a=assinaturaOS(o);
   return a ? `<div class="card" style="padding:10px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><b>✍️ Assinatura do cliente</b>${imgAss(o, a)}<span class="muted" style="font-size:13px">${h(a.nome)} · ${dt(a.em)} · ${a.remota?"assinou pelo link do WhatsApp":"colhida por "+h(a.colhidaPorNome||"")}</span><span class="spacer"></span><button class="btn sm" data-en="rel">📄 Relatório para o cliente</button></div>`
@@ -3548,6 +3958,7 @@ function foneWa(t){ let d=String(t||"").replace(/\D/g,"").replace(/^0+/,""); if 
 function msgWhats(o, tipo){
   const nome = String(o.cliente||"").split(" ")[0], oi = `Olá, ${nome}! ${apresentacao()}`;
   const lista = () => `${(o.servicos||[]).length?"Serviços:\n"+o.servicos.map(s=>`• ${sTxt(s)}: ${money(sTot(s))}`).join("\n")+"\n\n":""}${(o.pecas||[]).length?"Peças:\n"+o.pecas.map(p=>`• ${p.qtd}× ${p.nome}: ${money(p.qtd*p.preco)}`).join("\n")+"\n\n":""}${o.desconto?`Desconto: ${money(o.desconto)}\n`:""}`;
+  if (tipo==="entrada") return `${oi}\nRecebemos ${o.tipo==="solta"?"a peça":o.tipo==="pecas"?"as peças":"o motor"} ${o.motor||""}${o.veiculo?` do ${o.veiculo}`:""} (OS ${codOS(o)}).\n\nA oficina vai avaliar e, assim que soubermos o que precisa ser feito, mandamos o orçamento por aqui para você aprovar. 👍`;
   if (tipo==="orcamento") return `${oi}\nSegue o orçamento do motor ${o.motor||""} (OS ${codOS(o)}):\n\n${lista()}Total: ${money(totalOS(o))}${o.previsao?`\nPrazo previsto: ${dia(o.previsao)}`:""}\n\nPodemos seguir com o serviço?`;
   if (tipo==="adicional"){ const ad=adicionaisOS(o); return `${oi}\nDurante o serviço no motor ${o.motor||""} (OS ${codOS(o)}) a oficina encontrou mais coisas que precisam ser feitas:\n\n${ad.itens.map(x=>"• "+x).join("\n")||"(ver itens)"}\n\nO valor aprovado era ${money(ad.antes||0)}. Com isso, o novo total fica ${money(totalOS(o))}.\n\nPodemos seguir?`; }
   if (tipo==="pronto") return `${oi}\nBoa notícia: ${o.pecaSolta?`a peça ${o.pecaSolta}`:`o motor ${o.motor||""}`} (OS ${codOS(o)}) está ${o.pecaSolta?"pronta":"pronto"} para retirada! ✅\nValor: ${money(faltaPagar(o)>0.009?faltaPagar(o):totalOS(o))}${pagoOS(o)>0&&faltaPagar(o)>0.009?" (restante)":""}.\n\n🕗 Horário para retirada:\n${horarioAtend()}\n\nQualquer dúvida, é só chamar.`;
@@ -3558,8 +3969,9 @@ function msgWhats(o, tipo){
 }
 function menuWhats(o, tipoIni){
   if ((tipoIni==="orcamento" || (!tipoIni && o.status==="orcamento")) && pecasAvalPend(o).length){ toast(`Antes de mandar o orçamento, coloque o preço das peças pedidas na avaliação (${pecasAvalPend(o).length}).`); abrirOS(o.id); return; }
-  const tipos = [["orcamento","Orçamento"],...(o.status==="orcamento"?[["lembrete","Lembrete do orçamento"]]:[]),...(precisaReaprovar(o)?[["adicional","Serviço a mais"]]:[]),["pronto","Motor pronto"],["os","Resumo da OS"],...(faltaPagar(o)>0.009&&o.status==="entregue"?[["cobranca","Cobrança"]]:[]),["livre","Outra mensagem"]];
-  let tipo = tipoIni || (precisaReaprovar(o)?"adicional":o.status==="orcamento"?"orcamento":o.status==="pronta"?"pronto":o.status==="entregue"&&faltaPagar(o)>0.009?"cobranca":o.status==="entregue"?"os":"livre");
+  const vazio = o.status==="orcamento" && !(o.servicos||[]).length && !(o.pecas||[]).length;
+  const tipos = [...(o.status==="orcamento"?[["entrada","Recebemos o motor"]]:[]),...(vazio?[]:[["orcamento","Orçamento"]]),...(o.status==="orcamento"&&!vazio?[["lembrete","Lembrete do orçamento"]]:[]),...(precisaReaprovar(o)?[["adicional","Serviço a mais"]]:[]),["pronto","Motor pronto"],["os","Resumo da OS"],...(faltaPagar(o)>0.009&&o.status==="entregue"?[["cobranca","Cobrança"]]:[]),["livre","Outra mensagem"]];
+  let tipo = tipoIni==="orcamento"&&vazio ? "entrada" : tipoIni || (precisaReaprovar(o)?"adicional":o.status==="orcamento"?(vazio?"entrada":"orcamento"):o.status==="pronta"?"pronto":o.status==="entregue"&&faltaPagar(o)>0.009?"cobranca":o.status==="entregue"?"os":"livre");
   abrirModal(`<h2>💬 WhatsApp · ${h(o.cliente)}</h2>
     <div class="seg" id="wa-t" style="flex-wrap:wrap">${tipos.map(([k,t])=>`<button type="button" data-k="${k}" class="${k===tipo?"on":""}">${t}</button>`).join("")}</div>
     <label class="f">Telefone<input id="wa-f" value="${h(o.telefone||cliDaOS(o)?.telefone||"")}" placeholder="(85) 99999-9999"></label>
@@ -3791,6 +4203,7 @@ function pendenciasGerente0(){
     {k:"ljc", ic:"❌", t:"OS canceladas pelos lojistas", cor:"bad", l:S.os.filter(o=>o.status==="cancelada" && o.cancelamento && o.cancelamento.papel==="lojista" && !o.cancelamento.vistoEm).map(o=>({o, s:`${h(o.cancelamento.porNome)} · ${h(o.cancelamento.motivo)} · ${h(o.cancelamento.texto)}`}))},
     {k:"avis", ic:"📣", t:"Prontos e o cliente ainda não foi avisado", cor:"warn", l:S.os.filter(o=>o.status==="pronta" && !o.clienteAvisadoEm).map(o=>({o, s:`pronto desde ${dt(o.prontaEm)}${o.criadoPorPapel==="lojista"?` · lojista ${h(fnome(o.criadoPor))}`:""}`}))},
     {k:"aprzap", ic:"✅", t:"Cliente aprovou pelo WhatsApp: lançar a OS", cor:"ok", l:S.os.filter(o=>o.status==="orcamento" && o.aprovacaoRemota && !o.aprovacaoRemota.lancada).map(o=>({o, s:`${h(o.aprovacaoRemota.nome)} assinou ${dt(o.aprovacaoRemota.em)} · ${money(o.aprovacaoRemota.valor)}`}))},
+    {k:"aval", ic:"🔎", t:"Motores em avaliação sem orçamento há mais de 2 dias", cor:"warn", l:S.os.filter(o=>o.status==="orcamento" && o.avaliacao && !(o.servicos||[]).length && Date.now()-o.avaliacao.em>2*864e5).map(o=>({o, s:"entrada "+dt(o.avaliacao.em)+" · falta colocar os serviços e mandar o orçamento"}))},
     {k:"corr", ic:"↩️", t:"OS devolvidas para correção (esperando o lojista)", cor:"warn", l:S.os.filter(o=>o.correcao && !["entregue","cancelada"].includes(o.status)).map(o=>({o, s:h(o.correcao.motivo)+" · devolvida por "+h(o.correcao.porNome)+" "+dt(o.correcao.em)}))},
     {k:"corok", ic:"✅", t:"OS corrigidas pelo lojista (confira)", cor:"ok", l:S.os.filter(o=>o.corrigidaAviso && !o.corrigidaAviso.visto && Date.now()-o.corrigidaAviso.em<3*864e5 && (!o.corrigidaAviso.para || o.corrigidaAviso.para===me.id || ehChefe())).map(o=>({o, s:"corrigida por "+h(o.corrigidaAviso.porNome)+" · era: "+h(o.corrigidaAviso.motivo)}))},
     {k:"espass", ic:"⏳", t:"Orçamentos esperando o cliente assinar (mais de 2 dias ou link vencido)", cor:"warn", l:S.os.filter(o=>o.status==="orcamento" && (e=>e && (e.k==="vencido" || e.atraso))(estadoAss(o))).map(o=>({o, s:h(estadoAss(o).t)+" · "+h(estadoAss(o).s)}))},
@@ -4133,7 +4546,7 @@ FILL.chefe = () => {
   $("#pc-din").innerHTML = tile("ok", money(rHoje), "Recebido hoje") + tile("ok", money(rMes), "Recebido no mês") + tile(res>=0?"ok":"bad", money(res), "Resultado do mês") + tile(venc.length?"bad":"ok", money(vVal), "Vencido", `${venc.length} OS`);
   $("#pc-mes").innerHTML = tile("info", money(recLoja(h0)), "Vendas da loja hoje") + tile("accent", nEnt, "Motores entregues hoje") + tile("warn", money(desp+comp), "Despesas + compras", `despesas ${money(desp)} · peças ${money(comp)}`) + tile("info", money(aRec), "A receber", `${dev.length} OS`);
   // alertas
-  const PRIO=["chefe","libpix","semnf","contas","cliAlt","maq","falhas","banco","extrato","aprzap","corok","corr","espass","seg","prob","atr","venc","semmec","reap","semass","cx","senha","ljc","hoje","aut","loj","avis","nota","orc","parada","carga","dados","pecas","comp","falta","defeito","errada","medida","outro","cont","imp","bkp","bkteste"];
+  const PRIO=["chefe","libpix","semnf","contas","cliAlt","maq","falhas","banco","extrato","aprzap","corok","corr","aval","espass","seg","prob","atr","venc","semmec","reap","semass","cx","senha","ljc","hoje","aut","loj","avis","nota","orc","parada","carga","dados","pecas","comp","falta","defeito","errada","medida","outro","cont","imp","bkp","bkteste"];
   const P0 = pendenciasGerente().filter(p=>p.l.length||p.txt||p.n||p.html).sort((a,b)=>(PRIO.indexOf(a.k)<0?99:PRIO.indexOf(a.k))-(PRIO.indexOf(b.k)<0?99:PRIO.indexOf(b.k)));
   const P = UI.pcTodos ? P0 : P0.slice(0,5);
   $("#pc-al").innerHTML = (P.length ? P.map(p=>`<button type="button" class="row" data-pcgo="${h(p.go||"agora")}" data-pck="${h(p.k)}" style="width:100%;text-align:left;gap:10px;padding:10px 6px;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;cursor:pointer;border-left:4px solid var(--${p.cor||"line"})"><span style="font-size:20px">${p.ic}</span><span style="flex:1;font-weight:600">${h(p.t)}</span><b style="font-size:18px">${p.l.length||p.n||"!"}</b><span class="muted">›</span></button>`).join("") : `<div class="banner" style="margin:0">✅ Nada esperando por você agora.</div>`) + (P0.length>5 ? `<button type="button" class="btn sm" id="pc-mais" style="margin-top:8px">${UI.pcTodos?"Mostrar só os 5 mais importantes":`Ver todos (${P0.length})`}</button>` : "");
@@ -4387,7 +4800,7 @@ FILL.auditoria = () => {
     <td>${a.acao==="criou"?`<span style="color:var(--ok)">Cadastrou</span>`:a.acao==="apagou"?`<b style="color:var(--bad)">Apagou</b>`:(a.mud||[]).map(m=>`<div><span class="muted">${h(m.campo)}:</span> ${h(m.de)} → <b>${h(m.para)}</b></div>`).join("")}</td></tr>`).join("")}</table>` : `<div class="empty">Nenhuma mudança registrada ainda.</div>`;
 };
 /* =================== CÓPIA DE SEGURANÇA (backup) =================== */
-const COLS_BK = ["contasPagar","avisosChefe","maquininha","funcionarios","clientes","os","pecas","vendas","movimentos","fichas","compras","precos","caixa","autorizacoes","despesas","auditoria","acessos","reclamacoes","contagens","comprasFeitas","banco","conferencias","lixeira","senhas","config"];
+const COLS_BK = ["apanhas","contasPagar","avisosChefe","maquininha","funcionarios","clientes","os","pecas","vendas","movimentos","fichas","compras","precos","caixa","autorizacoes","despesas","auditoria","acessos","reclamacoes","contagens","comprasFeitas","banco","conferencias","lixeira","senhas","config"];
 const b64e = u8 => { let t=""; for (let i=0;i<u8.length;i+=0x8000) t+=String.fromCharCode.apply(null, u8.subarray(i,i+0x8000)); return btoa(t); };
 const b64d = t => Uint8Array.from(atob(t), c=>c.charCodeAt(0));
 async function chaveCopia(senha, salt){ const k=await crypto.subtle.importKey("raw", new TextEncoder().encode(senha), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:150000, hash:"SHA-256"}, k, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]); }
@@ -4576,8 +4989,8 @@ function docValido(v){ const d=String(v||"").replace(/\D/g,"");
   return false; }
 function fmtDoc(v){ const d=String(v||"").replace(/\D/g,""); return d.length===11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4") : d.length===14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5") : String(v||"").trim(); }
 function ligarBlocoAssinatura(m, getComo, termo, nomePadrao, docPadrao){
-  const pad=padAssinatura($("#as-pad",m)); $("#as-termo",m).textContent=termo; $("#as-n",m).value=nomePadrao||""; $("#as-d",m).value=docPadrao?fmtDoc(docPadrao):"";
-  const atual=()=>{ const pes=getComo()==="Pessoalmente"; $("#as-wrap",m).hidden=!pes; $("#as-dist",m).hidden=pes; }; atual();
+  const pad=padAssinatura($("#as-pad",m)); if ($("#as-termo",m)) $("#as-termo",m).textContent=termo; $("#as-n",m).value=nomePadrao||""; $("#as-d",m).value=docPadrao?fmtDoc(docPadrao):"";
+  const atual=()=>{ const pes=getComo()==="Pessoalmente"; $("#as-wrap",m).hidden=!pes; if ($("#as-dist",m)) $("#as-dist",m).hidden=pes; }; atual();
   return { atual, ler:()=>{ if (getComo()!=="Pessoalmente") return {ok:true, ass:null};
     if (pad.vazio()){ toast("Falta a assinatura do cliente."); return {ok:false}; } const nome=$("#as-n",m).value.trim(); if (!nome){ toast("Escreva o nome de quem assinou."); return {ok:false}; }
     const doc=$("#as-d",m).value.trim(); if (!docValido(doc)){ toast(doc?"CPF/CNPJ inválido. Confira os números.":"O CPF de quem assina é obrigatório."); $("#as-d",m).focus(); return {ok:false}; }
@@ -4613,6 +5026,7 @@ async function pedirAssinaturaZap(o){
 /* SITUAÇÃO DA ASSINATURA, bem clara para o atendente */
 function estadoAss(o){
   const ar=o.aprovacaoRemota, pd=o.assinaturaPedido, a=assinaturaOS(o), ag=Date.now();
+  if (o.status==="orcamento" && !(o.servicos||[]).length && !(o.pecas||[]).length) return {k:"aval", t:"🔎 Em avaliação · falta o orçamento", cl:"p-aguardando", s:o.avaliacao?`entrada registrada ${dt(o.avaliacao.em)} por ${o.avaliacao.porNome||""}`:"sem serviços ainda"};
   if (ar && !ar.lancada && o.status==="orcamento") return {k:"aprovou", t:"✅ Cliente aprovou o orçamento", cl:"p-pronta", s:`${ar.nome} · ${dt(ar.em)}`};
   if (pd && !(a && (a.em||0)>=pd.em) && !(ar && (ar.em||0)>=pd.em)){
     if (pd.em+7*864e5 < ag) return {k:"vencido", t:"⌛ Link vencido · mandar outro", cl:"p-cancelada", s:`enviado ${dt(pd.em)}`};
@@ -4766,13 +5180,13 @@ async function buscarOSAntigas(q){
 
 /* ---- lojista: abre e cancela OS, recebe os carros ---- */
 const ehLojista = () => !!me && me.papel==="lojista";
-const podeAbrirOS = () => gerencia() || ehLojista();
+const podeAbrirOS = () => gerencia() || (ehLojista() && !LOJISTA_TESTE);
 const osDoLojista = () => S.os.filter(o=>o.criadoPor===me.id).sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
-SHELL.lojas = () => `<div class="top"><h1>Minhas OS</h1><button class="btn pri" id="lj-nova" style="font-size:18px;padding:12px 20px">+ Nova OS</button></div><div id="lj-av"></div>
+SHELL.lojas = () => `<div class="top"><h1>Minhas OS</h1><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="lj-nap" style="font-size:17px;padding:12px 16px">🚗 Nota de apanha</button><button class="btn pri" id="lj-nova" style="font-size:18px;padding:12px 20px">+ Nova OS</button></div></div><div id="lj-av"></div>
   <div id="lj-pend"></div>
   <div class="card"><div class="row" style="margin-bottom:10px"><div class="seg" id="lj-f">${[["ativas","Em andamento"],["todas","Todas as minhas"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${(UI.ljF||"ativas")===k?"on":""}">${t}</button>`).join("")}</div><span class="spacer"></span><input id="lj-q" type="search" placeholder="Buscar nº, cliente, telefone, motor, placa" value="${h(UI.ljQ||"")}" style="width:min(280px,100%)"></div><div class="tbl-wrap" id="lj-l"></div></div>`;
 BIND.lojas = () => {
-  $("#lj-nova").onclick=()=>formOS(); ligarAvisosCli($("#lj-av"));
+  $("#lj-nova").onclick=()=>formOS(); $("#lj-nap").onclick=()=>{ location.hash="#apanhas"; }; ligarAvisosCli($("#lj-av"));
   $("#lj-f").onclick=e=>{ const x=e.target.closest("[data-k]"); if(!x) return; UI.ljF=x.dataset.k; $("#lj-f").querySelectorAll("button").forEach(y=>y.classList.toggle("on",y===x)); FILL.lojas(); };
   $("#lj-q").oninput=e=>{ UI.ljQ=e.target.value; FILL.lojas(); };
   $("#lj-pend").onclick=e=>{ const g=k=>{ const b=e.target.closest(`[data-${k}]`); return b && S.os.find(o=>o.id===b.getAttribute("data-"+k)); };
@@ -4811,7 +5225,9 @@ async function marcarRecebida(id){ try{ await patchOS(id, d=>{ if (d.recebidaEm)
 async function marcarCancVista(id){ try{ await patchOS(id, d=>{ if (!d.cancelamento || d.cancelamento.vistoEm) return; d.cancelamento.vistoEm=Date.now(); d.cancelamento.vistoPorNome=me.nome; addHist(d, `${me.nome} viu o cancelamento feito pelo lojista`); }); }catch(err){ erro(err); } }
 
 /* ---- veículos e versões de motor (lista inicial; o sistema também aprende com as OS lançadas) ---- */
-const VEIC = []; /* sem lista pronta: o sistema aprende os veículos e motores com o que a equipe digita nas OS */
+/* LISTA PRONTA dos veículos mais comuns no Brasil e seus motores (sugestões: confira sempre no bloco).
+   Formato: [marca, modelo (pode ter "/" para nomes parecidos), linha, [motores]]. O sistema também aprende o que a equipe digita. */
+const VEIC = [["VW", "Golf", "leve", ["EA111 1.6", "EA113 1.6", "EA113 2.0", "EA211 1.4 TSI", "EA888 2.0 TSI"]], ["VW", "Gol", "leve", ["AP 1.6", "AP 1.8", "AP 2.0", "AE 1.6 (CHT)", "EA111 1.0 8V", "EA111 1.0 16V", "EA111 1.6 8V", "EA211 1.0 3cil", "EA211 1.6 16V"]], ["VW", "Voyage", "leve", ["AP 1.6", "EA111 1.0", "EA111 1.6", "EA211 1.0 3cil", "EA211 1.6 16V"]], ["VW", "Fox/CrossFox/SpaceFox", "leve", ["EA111 1.0", "EA111 1.6", "EA211 1.0 3cil", "EA211 1.6 16V"]], ["VW", "Saveiro", "leve", ["AP 1.6", "AP 1.8", "EA111 1.6", "EA211 1.6 16V"]], ["VW", "Parati", "leve", ["AP 1.6", "AP 1.8", "AP 2.0", "EA111 1.0"]], ["VW", "Santana/Quantum", "leve", ["AP 1.8", "AP 2.0"]], ["VW", "Polo", "leve", ["EA111 1.6", "EA113 2.0", "EA211 1.0 TSI", "EA211 1.6 MSI"]], ["VW", "Virtus", "leve", ["EA211 1.0 TSI", "EA211 1.6 MSI", "EA211 1.4 TSI"]], ["VW", "T-Cross", "leve", ["EA211 1.0 TSI", "EA211 1.4 TSI"]], ["VW", "Nivus", "leve", ["EA211 1.0 TSI"]], ["VW", "Jetta", "leve", ["EA211 1.4 TSI", "EA888 2.0 TSI", "2.5 5cil"]], ["VW", "Kombi", "leve", ["EA111 1.4", "Boxer 1.6 a ar"]], ["VW", "Fusca/Brasília", "leve", ["Boxer 1.3 a ar", "Boxer 1.5 a ar", "Boxer 1.6 a ar"]], ["VW", "Amarok", "leve", ["EA189 2.0 TDI", "V6 3.0 TDI"]], ["Chevrolet", "Onix", "leve", ["SPE/4 1.0", "SPE/4 1.4", "CSS Prime 1.0 3cil", "CSS Prime 1.0 Turbo"]], ["Chevrolet", "Prisma", "leve", ["SPE/4 1.0", "SPE/4 1.4"]], ["Chevrolet", "Celta", "leve", ["VHC 1.0", "VHCE 1.0", "1.4 8V"]], ["Chevrolet", "Corsa", "leve", ["1.0 8V", "1.0 16V", "1.4 8V", "1.6 8V", "1.8 8V"]], ["Chevrolet", "Classic", "leve", ["VHCE 1.0", "1.6 8V"]], ["Chevrolet", "Cobalt", "leve", ["SPE/4 1.4", "SPE/4 1.8"]], ["Chevrolet", "Spin", "leve", ["SPE/4 1.8"]], ["Chevrolet", "Cruze", "leve", ["Ecotec 1.8", "1.4 Turbo"]], ["Chevrolet", "Tracker", "leve", ["Ecotec 1.8", "1.4 Turbo", "1.0 Turbo", "1.2 Turbo"]], ["Chevrolet", "Montana", "leve", ["1.4 8V", "1.8 8V", "1.2 Turbo"]], ["Chevrolet", "S10", "leve", ["2.8 Duramax", "2.8 MWM", "2.4 Flexpower", "2.5 Ecotec", "2.2 8V", "4.3 V6"]], ["Chevrolet", "Blazer", "leve", ["2.2 8V", "2.4 8V", "2.8 MWM", "4.3 V6"]], ["Chevrolet", "Astra", "leve", ["1.8 8V", "2.0 8V", "2.0 16V"]], ["Chevrolet", "Vectra", "leve", ["2.0 8V", "2.2 16V", "2.4 16V"]], ["Chevrolet", "Meriva/Zafira", "leve", ["1.4 8V", "1.8 8V", "2.0 8V"]], ["Chevrolet", "Agile", "leve", ["1.4 8V"]], ["Chevrolet", "Kadett/Monza/Ipanema", "leve", ["Família II 1.8", "Família II 2.0"]], ["Chevrolet", "Chevette", "leve", ["1.4", "1.6"]], ["Chevrolet", "Opala/Caravan", "leve", ["2.5 4cil", "4.1 6cil"]], ["Chevrolet", "D20/A20/C20", "pesada", ["Maxion S4 4.0", "Perkins Q20B 4.0", "4.1 6cil"]], ["Fiat", "Fiorino", "leve", ["Fire 1.3", "Fire 1.4", "Fiasa 1.5"]], ["Fiat", "Uno", "leve", ["Fire 1.0", "Fire 1.4", "Firefly 1.0 3cil", "Fiasa 1.0", "Fiasa 1.5"]], ["Fiat", "Palio/Weekend", "leve", ["Fire 1.0", "Fire 1.3", "Fire 1.4", "E.torQ 1.6", "Fiasa 1.0", "1.8 8V GM"]], ["Fiat", "Siena/Grand Siena", "leve", ["Fire 1.0", "Fire 1.4", "E.torQ 1.6"]], ["Fiat", "Strada", "leve", ["Fire 1.4", "Firefly 1.3", "E.torQ 1.6", "E.torQ 1.8", "Fiasa 1.5", "1.8 8V GM"]], ["Fiat", "Mobi", "leve", ["Fire 1.0", "Firefly 1.0 3cil"]], ["Fiat", "Argo", "leve", ["Firefly 1.0 3cil", "Firefly 1.3", "E.torQ 1.8"]], ["Fiat", "Cronos", "leve", ["Firefly 1.3", "E.torQ 1.8"]], ["Fiat", "Toro", "leve", ["E.torQ 1.8", "Tigershark 2.4", "Multijet 2.0 diesel", "T270 1.3 Turbo"]], ["Fiat", "Doblò", "leve", ["Fire 1.4", "E.torQ 1.8", "1.8 8V GM"]], ["Fiat", "Punto", "leve", ["Fire 1.4", "1.4 T-Jet", "E.torQ 1.6", "E.torQ 1.8"]], ["Fiat", "Idea", "leve", ["Fire 1.4", "E.torQ 1.6", "E.torQ 1.8"]], ["Fiat", "Pulse/Fastback", "leve", ["Firefly 1.3", "T200 1.0 Turbo", "T270 1.3 Turbo"]], ["Fiat", "Ducato", "leve", ["2.3 Multijet", "2.8 JTD"]], ["Ford", "Fiesta", "leve", ["Zetec RoCam 1.0", "Zetec RoCam 1.6", "Sigma 1.6"]], ["Ford", "EcoSport", "leve", ["Zetec RoCam 1.6", "Duratec 2.0", "Sigma 1.6", "Dragon 1.5"]], ["Ford", "Focus", "leve", ["Zetec 1.8", "Duratec 2.0", "Sigma 1.6"]], ["Ford", "Ranger", "leve", ["2.2 Duratorq", "3.2 Duratorq", "2.8 Power Stroke", "3.0 Power Stroke", "2.3 Duratec", "2.5 Duratec"]], ["Ford", "Courier", "leve", ["Zetec RoCam 1.6"]], ["Ford", "Escort/Verona", "leve", ["AP 1.8", "CHT 1.6", "Zetec 1.8"]], ["Ford", "F-1000", "pesada", ["MWM D229-4", "MWM 4.07"]], ["Ford", "F-250", "pesada", ["MWM Sprint 4.2", "Cummins 3.9"]], ["Toyota", "Hilux", "leve", ["1KD 3.0", "2KD 2.5", "1GD 2.8", "2TR 2.7"]], ["Toyota", "SW4", "leve", ["1KD 3.0", "1GD 2.8", "2TR 2.7"]], ["Toyota", "Corolla", "leve", ["1ZZ 1.8", "2ZR 1.8", "3ZR 2.0", "M20A 2.0"]], ["Toyota", "Etios", "leve", ["1NR 1.3", "2NR 1.5"]], ["Toyota", "Yaris", "leve", ["1NR 1.3", "2NR 1.5"]], ["Toyota", "Bandeirante", "pesada", ["Mercedes OM 314", "Mercedes OM 364", "Toyota 14B"]], ["Honda", "HR-V", "leve", ["R18 1.8", "L15 1.5"]], ["Honda", "Civic", "leve", ["D16 1.6", "R18 1.8", "R20 2.0", "L15 1.5 Turbo"]], ["Honda", "Fit", "leve", ["L13 1.4", "L15 1.5"]], ["Honda", "City", "leve", ["L15 1.5"]], ["Hyundai", "HB20", "leve", ["Kappa 1.0", "Kappa 1.0 Turbo", "Gamma 1.6"]], ["Hyundai", "Creta", "leve", ["Gamma 1.6", "Nu 2.0", "Kappa 1.0 Turbo"]], ["Hyundai", "Tucson/ix35", "leve", ["Beta 2.0", "Theta 2.0"]], ["Hyundai", "HR", "leve", ["D4BH 2.5", "D4CB 2.5"]], ["Renault", "Kwid", "leve", ["B4D SCe 1.0"]], ["Renault", "Sandero/Logan", "leve", ["D4D 1.0 16V", "K7M 1.6 8V", "K4M 1.6 16V", "B4D SCe 1.0", "H4M SCe 1.6"]], ["Renault", "Duster/Oroch", "leve", ["K4M 1.6 16V", "F4R 2.0", "H4M SCe 1.6"]], ["Renault", "Clio", "leve", ["D7D 1.0 8V", "D4D 1.0 16V", "K7J 1.0"]], ["Renault", "Master", "leve", ["G9U 2.5", "M9T 2.3"]], ["Nissan", "March", "leve", ["HR12 1.0", "HR16 1.6", "D4D 1.0 16V"]], ["Nissan", "Versa", "leve", ["HR16 1.6"]], ["Nissan", "Kicks", "leve", ["HR16 1.6"]], ["Nissan", "Frontier", "leve", ["YD25 2.5", "QR25 2.5", "2.8 MWM"]], ["Mitsubishi", "L200", "leve", ["4D56 2.5", "4M41 3.2", "4N15 2.4"]], ["Mitsubishi", "Pajero", "leve", ["4D56 2.5", "4M40 2.8", "4M41 3.2", "6G72 3.0 V6"]], ["Jeep", "Renegade", "leve", ["E.torQ 1.8", "Multijet 2.0 diesel", "T270 1.3 Turbo"]], ["Jeep", "Compass", "leve", ["Tigershark 2.0", "Multijet 2.0 diesel", "T270 1.3 Turbo"]], ["Peugeot", "206/207", "leve", ["TU3 1.4", "TU5 1.6 16V", "D4D 1.0 16V"]], ["Peugeot", "208", "leve", ["EB0 1.2 Puretech", "TU3 1.5", "EC5 1.6"]], ["Peugeot", "Partner", "leve", ["TU5 1.6", "DW8 1.9 diesel"]], ["Peugeot", "Boxer", "leve", ["2.3 Multijet", "2.8 HDi", "2.2 HDi"]], ["Citroën", "C3", "leve", ["TU3 1.4", "EC5 1.6", "EB0 1.2 Puretech"]], ["Citroën", "Jumper", "leve", ["2.3 Multijet", "2.8 HDi", "2.2 HDi"]], ["Kia", "Bongo", "leve", ["J2 2.7", "J3 2.9", "D4CB 2.5"]], ["Mercedes-Benz", "Sprinter", "leve", ["OM 611 2.2", "OM 646 2.2", "OM 651 2.2"]], ["VW", "Up", "leve", ["EA211 1.0 3cil", "EA211 1.0 TSI"]], ["Ford", "Ka", "leve", ["Zetec RoCam 1.0", "Zetec RoCam 1.6", "Dragon 1.0 3cil", "Dragon 1.5"]], ["Mercedes-Benz", "Accelo", "pesada", ["OM 904", "OM 924"]], ["Mercedes-Benz", "Atego", "pesada", ["OM 904", "OM 906", "OM 924", "OM 926"]], ["Mercedes-Benz", "Axor", "pesada", ["OM 457", "OM 906", "OM 926"]], ["Mercedes-Benz", "Actros", "pesada", ["OM 501", "OM 502", "OM 471"]], ["Mercedes-Benz", "L 1113/L 1313/L 1513", "pesada", ["OM 352", "OM 352A"]], ["Mercedes-Benz", "608/708", "pesada", ["OM 314", "OM 364"]], ["Mercedes-Benz", "710/712/912/914", "pesada", ["OM 364", "OM 904"]], ["Mercedes-Benz", "1620/1621/1718/1720", "pesada", ["OM 366", "OM 447"]], ["Mercedes-Benz", "1938/1944/1634", "pesada", ["OM 447", "OM 457"]], ["Mercedes-Benz", "Ônibus OF/O 500", "pesada", ["OM 366", "OM 904", "OM 906", "OM 924", "OM 926", "OM 457"]], ["VW", "Delivery", "pesada", ["Cummins ISF 2.8", "Cummins ISF 3.8", "MWM 4.08", "Cummins 4BT"]], ["VW", "Worker", "pesada", ["MWM 4.10", "MWM 4.12", "MWM 6.10", "MWM 6.12", "Cummins 6BT", "Cummins ISB"]], ["VW", "Constellation", "pesada", ["Cummins ISB 6.7", "Cummins ISC", "Cummins ISL", "MAN D08", "MWM 6.12"]], ["VW", "Volksbus", "pesada", ["MWM 4.12", "Cummins ISB", "MAN D08"]], ["Ford", "Cargo", "pesada", ["Cummins 6BT", "Cummins ISB", "Cummins ISC", "Cummins ISF", "MWM"]], ["Ford", "F-4000", "pesada", ["MWM D229-4", "MWM 4.07", "Cummins ISF 3.8"]], ["Ford", "F-12000/F-14000", "pesada", ["MWM 6.07", "Cummins 6BT"]], ["Volvo", "FH", "pesada", ["D12", "D13", "D16"]], ["Volvo", "FM", "pesada", ["D11", "D12", "D13"]], ["Volvo", "NH12", "pesada", ["D12"]], ["Volvo", "VM", "pesada", ["D7", "MWM 6.12"]], ["Volvo", "N10/N12", "pesada", ["TD100", "TD120"]], ["Iveco", "Daily", "pesada", ["F1C 3.0", "F1A 2.3", "Sofim 2.8"]], ["Iveco", "Tector", "pesada", ["NEF 6 (FPT 6.7)", "FPT N60"]], ["Iveco", "Stralis", "pesada", ["Cursor 9", "Cursor 13"]], ["DAF", "XF/CF", "pesada", ["PACCAR MX-13", "PACCAR MX-11"]], ["Agrale", "Agrale", "pesada", ["MWM 4.08", "MWM 4.10", "Cummins ISF"]], ["International", "4700/9800", "pesada", ["Navistar DT466", "Cummins ISM"]], ["Massey Ferguson", "Trator MF", "pesada", ["Perkins 4.236", "Perkins 4.248", "Perkins 6.357", "AGCO Power"]], ["Valtra", "Trator Valtra/Valmet", "pesada", ["Valmet 311", "Valmet 411", "Valmet 420", "AGCO Sisu 44", "AGCO Sisu 49"]], ["New Holland", "Trator New Holland/Ford", "pesada", ["FPT 8035", "Ford 4.4"]], ["John Deere", "Trator John Deere", "pesada", ["JD 4045", "JD 6068"]], ["JCB", "Retroescavadeira JCB 3C/4CX", "pesada", ["Perkins 1104", "JCB 444"]], ["Case", "Retroescavadeira Case 580", "pesada", ["Cummins 4BT", "FPT F4"]], ["Caterpillar", "Máquina Caterpillar", "pesada", ["CAT 3054", "CAT 3304", "CAT C7"]], ["—", "Gerador", "pesada", ["MWM", "Cummins 6BT", "Perkins"]], ["Scania", "111/112/113/114", "scania", ["DS11", "DSC11", "DC11"]], ["Scania", "124", "scania", ["DC12", "DSC12"]], ["Scania", "P/G/R/S", "scania", ["DC9", "DC11", "DC12", "DC13", "DC16"]], ["Scania", "Ônibus Scania", "scania", ["DC9", "DSC11", "DC12", "DC13"]], ["Scania", "Scania", "scania", ["DC9", "DC11", "DC12", "DC13", "DC16", "DS11", "DSC11", "DSC12"]]];
 const nz = x => norm(x).replace(/[\s\-./]/g,"");
 const veicTodos = () => { const ap=(S.veicCfg&&S.veicCfg.lista)||[]; const L=VEIC.map(v=>[v[0],v[1],v[2],v[3].slice()]);
   ap.forEach(a=>{ const ex=L.find(v=>nz(v[1])===nz(a.modelo)); if (ex){ (a.motores||[]).forEach(m=>{ if(!ex[3].some(x=>nz(x)===nz(m))) ex[3].push(m); }); } else L.push([a.marca||"",a.modelo,a.linha||"leve",(a.motores||[]).slice()]); }); return L; };
@@ -4860,48 +5276,57 @@ const nvMotorTxt = n => n.tipo==="pecas" ? (n.motor.trim()||"Peças de motor") :
 const PECAS_SOLTAS = ["Cabeçote","Virabrequim","Bloco","Bielas","Comando de válvulas","Volante","Eixo balanceador","Outra"];
 const PECAS_DO_MOTOR = ["Cabeçote","Bloco","Virabrequim","Bielas","Comando de válvulas","Volante","Eixo balanceador"];
 const nvPecasM = n => [...(n.pecasM||[])].concat(String(n.pecasOutra||"").split(",").map(x=>x.trim()).filter(Boolean));
-function nvNovo(tipo){ return {tipo:tipo||"motor", qtdP:{...QTD_PADRAO}, solta:"", soltaOutra:"", pecasM:[], pecasOutra:"", cliId:null, novo:null, q:"", veiculo:"", placa:"", motor:"", numMotor:"", linha:"leve", problema:"", servs:new Map(), pecas:[], ent:new Set(), entObs:"", fotos:[], aprovou:null, como:"WhatsApp", quemAprov:"", previsao:"", setor:"", responsavel:"", prioridade:"normal"}; }
+function nvNovo(tipo){ return {tipo:tipo||"motor", qtdP:{...QTD_PADRAO}, solta:"", soltaOutra:"", pecasM:[], pecasOutra:"", carro:false, apanha:apanhaNova(), cliId:null, novo:null, q:"", veiculo:"", placa:"", motor:"", numMotor:"", linha:"leve", problema:"", servs:new Map(), pecas:[], ent:new Set(), entObs:"", fotos:[], aprovou:null, como:"WhatsApp", quemAprov:"", previsao:"", setor:"", responsavel:"", prioridade:"normal"}; }
 const nvCli = () => UI.nv.cliId ? S.clientes.find(c=>c.id===UI.nv.cliId) : null;
 const nvTot = () => { const tab=precosDaLinha(UI.nv.linha); let t=0; UI.nv.servs.forEach((q,d)=>{ const p=tab.find(x=>x.desc===d); if (p) t+=p.valor*q; }); UI.nv.pecas.forEach(x=>t+=(Number(x.p.preco)||0)*x.q); return t; };
-SHELL.novaos = () => { if (!UI.nv) UI.nv = nvNovo(); const n=UI.nv, ger=direcao();
-  return `<div class="top"><button class="btn" id="nv-voltar">← Voltar</button><h1>Nova ordem de serviço</h1></div>
+SHELL.novaos = () => { if (ehLojista() && LOJISTA_TESTE && !(UI.nv && UI.nv.modoApanha)){ UI.nv=nvNovo("motor"); UI.nv.modoApanha=true; UI.nv.carro=true; } if (!UI.nv) UI.nv = nvNovo(); const n=UI.nv, ger=direcao();
+  return `<div class="top"><button class="btn" id="nv-voltar">← Voltar</button><h1>${n.modoApanha?"🚗 Nova nota de apanha":"Nova ordem de serviço"}</h1></div>
   <div class="nv-wrap"><div class="nv">
    <div class="card nv-sec" style="padding:10px 14px"><label class="f" style="margin:0">Aberta por <span class="muted" style="font-weight:400">(preenchido pelo sistema, não dá para mudar)</span>
      <input id="nv-autor" value="${h(me.nome)}${cargo(me)?" · "+h(cargo(me)):""}" disabled readonly tabindex="-1" aria-readonly="true" style="opacity:.85;cursor:not-allowed"></label></div>
    <section class="card nv-sec"><h2><span class="nv-n">1</span> Cliente</h2><div id="nv-cli"></div></section>
    <section class="card nv-sec"><h2><span class="nv-n">2</span> ${n.tipo==="solta"?"Peça solta":n.tipo==="pecas"?"Peças de um motor (já desmontado)":"Veículo e motor"}</h2>
-     <div class="seg" id="nv-tipo" style="margin-top:8px">${[["motor","🔧 Motor inteiro"],["pecas","🧩 Peças de um motor"],["solta","⚙️ Peça solta"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${n.tipo===k?"on":""}">${t}</button>`).join("")}</div>
+     <div class="seg" id="nv-tipo" style="margin-top:8px;${n.modoApanha?"display:none":""}">${[["motor","🔧 Motor inteiro"],["pecas","🧩 Peças de um motor"],["solta","⚙️ Peça solta"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${n.tipo===k?"on":""}">${t}</button>`).join("")}</div>
+     ${n.tipo==="motor"&&!n.modoApanha?`<div style="margin-top:8px"><span class="muted" style="font-size:14px">O motor chegou:</span><div class="seg" id="nv-carro" style="margin-top:4px">${[[false,"🔧 Só o motor"],[true,"🚗 Dentro do carro (carro fechado)"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${!!n.carro===k?"on":""}">${t}</button>`).join("")}</div></div>`:""}
      ${n.tipo==="solta"?`<div style="margin-top:10px"><b>Qual peça veio? *</b><div class="row" id="nv-solta" style="gap:6px;flex-wrap:wrap;margin-top:6px">${PECAS_SOLTAS.map(x=>`<button type="button" class="chip ${n.solta===x?"on":""}" data-sl="${h(x)}">${h(x)}</button>`).join("")}</div>
        <input id="nv-sol2" value="${h(n.soltaOutra)}" placeholder="Qual peça?" style="margin-top:6px;width:100%" ${n.solta==="Outra"?"":"hidden"}>
        <div class="muted" style="font-size:13px;margin-top:6px">Motor de origem e veículo são opcionais, mas ajudam o mecânico a achar as medidas.</div></div>`:""}
-     ${n.tipo==="motor"?`<div style="margin-top:10px"><b>🔩 Peças deste motor</b> <span class="muted" style="font-size:13px">(já vem o normal; só ajuste se for diferente)</span><div class="row" id="nv-qp" style="gap:8px;flex-wrap:wrap;margin-top:6px"></div><div class="muted" style="font-size:13px;margin-top:4px">Cada peça ganha a sua etiqueta com o mesmo número da OS. Na desmontagem, o mecânico só confere.</div></div>`:""}
+     ${n.tipo==="motor"&&!n.modoApanha?`<div style="margin-top:10px"><b>🔩 Peças deste motor</b> <span class="muted" style="font-size:13px">(já vem o normal; só ajuste se for diferente)</span><div class="row" id="nv-qp" style="gap:8px;flex-wrap:wrap;margin-top:6px"></div><div class="muted" style="font-size:13px;margin-top:4px">Cada peça ganha a sua etiqueta com o mesmo número da OS. Na desmontagem, o mecânico só confere.</div></div>`:""}
      ${n.tipo==="pecas"?`<div style="margin-top:10px"><b>Quais peças vieram? *</b> <span class="muted" style="font-size:13px">(marque todas)</span><div class="row" id="nv-pm" style="gap:6px;flex-wrap:wrap;margin-top:6px">${PECAS_DO_MOTOR.map(x=>`<button type="button" class="chip ${(n.pecasM||[]).includes(x)?"on":""}" data-pm="${h(x)}">${h(x)}</button>`).join("")}</div>
        <input id="nv-pmo" value="${h(n.pecasOutra||"")}" placeholder="Outra peça? Escreva (separe por vírgula)" style="margin-top:6px;width:100%">
        <div class="banner" style="margin:8px 0 0" id="nv-pmc"></div></div>`:""}
      <div class="form os" style="margin-top:8px">
        <label class="f meia">Veículo<input id="nv-vei" list="dl-vei" autocomplete="off" value="${h(n.veiculo)}" placeholder="Digite o carro: Kwid, Gol, Atego…"><datalist id="dl-vei">${veicTodos().map(v=>`<option value="${h(v[0]+" "+v[1])}">`).join("")}</datalist></label>
        <label class="f">Placa<input id="nv-pla" value="${h(n.placa)}"></label>
-       <label class="f">Linha<div class="seg" id="nv-lin">${LINHAS.map(([k,t])=>`<button type="button" data-k="${k}" class="${n.linha===k?"on":""}">${t}</button>`).join("")}</div></label>
-       <label class="f meia">${n.tipo==="solta"?"Motor de origem (opcional)":n.tipo==="pecas"?"De qual motor são (opcional)":"Motor *"}<input id="nv-mot" value="${h(n.motor)}" placeholder="Ex.: AP 1.6, OM 924, DC13"></label>
-       <label class="f meia">Nº do motor (no bloco)<input id="nv-nmot" value="${h(n.numMotor)}"></label>
+       <label class="f">Linha<div class="seg" id="nv-lin" style="flex-wrap:wrap">${LINHAS.map(([k,t])=>`<button type="button" data-k="${k}" class="${n.linha===k?"on":""}">${t}</button>`).join("")}</div></label>
+       <label class="f meia">${n.tipo==="solta"?"Motor de origem (opcional)":n.tipo==="pecas"?"De qual motor são (opcional)":n.modoApanha?"Motor (se souber)":"Motor *"}<input id="nv-mot" value="${h(n.motor)}" placeholder="Ex.: AP 1.6, OM 924, DC13"></label>
+       <label class="f meia" ${n.modoApanha?"hidden":""}>Nº do motor (no bloco)<input id="nv-nmot" value="${h(n.numMotor)}"></label>
        <div class="wide" id="nv-mv"></div>
        <div class="wide" id="nv-gar"></div>
        <div class="wide"><span class="muted" style="font-size:14px">De onde ${n.tipo==="solta"?"veio a peça":n.tipo==="pecas"?"vieram as peças":"veio o motor"}?</span><div class="seg" id="nv-ori" style="margin-top:4px;flex-wrap:wrap">${[["cliente","Do próprio cliente"],["empresa","🏢 De outra empresa"],["motor","🔁 De outro motor"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${(n.origemTipo||"cliente")===k?"on":""}">${t}</button>`).join("")}</div>
          <input id="nv-orin" style="margin-top:6px;width:100%" ${(n.origemTipo||"cliente")==="cliente"?"hidden":""} value="${h(n.origemNome||"")}" placeholder="${n.origemTipo==="motor"?"Número da OS do outro motor ou qual motor (ex.: 10050, ou MWM do caminhão do João)":"Nome da empresa (ex.: Retífica São José, Auto Peças Silva)"}"></div>
-       <label class="f wide">O que o cliente reclamou / pediu<textarea id="nv-pro" rows="2">${h(n.problema)}</textarea></label></div></section>
-   <section class="card nv-sec"><h2><span class="nv-n">3</span> Serviços e valores</h2>
-     ${n.tipo!=="solta"?`<div class="banner" style="margin:8px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">🔎 <b>Ainda sem diagnóstico?</b> Lance só a entrada (desmontagem e lavagem). Os outros serviços o mecânico marca na <b>avaliação</b>, e o cliente aprova o orçamento final antes de usinar.</span><button type="button" class="btn sm pri" id="nv-diag">Só diagnóstico</button></div>`:""}
+       <label class="f wide">${n.modoApanha?"Serviços solicitados pelo cliente *":"O que o cliente reclamou / pediu"}<textarea id="nv-pro" rows="2" placeholder="${n.modoApanha?"Ex.: serviço de motor":""}">${h(n.problema)}</textarea>${n.modoApanha&&precosDaLinha(n.linha).length?`<div class="row" id="nv-prochips" style="gap:6px;flex-wrap:wrap;margin-top:6px">${precosDaLinha(n.linha).slice(0,8).map(p=>`<button type="button" class="chip" data-pc="${h(p.desc)}">＋ ${h(p.desc)}</button>`).join("")}</div>`:""}</label></div></section>
+   <section class="card nv-sec" style="${n.modoApanha?"display:none":""}"><h2><span class="nv-n">3</span> Serviços e valores</h2>
+     ${!OFICINA?`<div class="banner" id="nv-entw" style="margin:8px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;${n.soEntrada?"border-left:5px solid var(--accent)":""}"><span style="flex:1;min-width:200px">${n.soEntrada?`📥 <b>Só a entrada.</b> A OS vai ser registrada <b>sem serviços</b>. Depois que a oficina avaliar, você abre a OS, coloca os serviços e manda o orçamento.`:`📥 <b>Ainda não sabe o que o motor precisa?</b> Registre <b>só a entrada</b> agora (cliente, carro, motor, peças que vieram). Os serviços você coloca depois da avaliação.`}</span><button type="button" class="btn sm ${n.soEntrada?"":"pri"}" id="nv-soent">${n.soEntrada?"Voltar a escolher serviços":"📥 Só a entrada (sem serviços)"}</button></div>`:""}
+     ${OFICINA&&n.tipo!=="solta"?`<div class="banner" style="margin:8px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">🔎 <b>Ainda sem diagnóstico?</b> Lance só a entrada (desmontagem e lavagem). Os outros serviços o mecânico marca na <b>avaliação</b>, e o cliente aprova o orçamento final antes de usinar.</span><button type="button" class="btn sm pri" id="nv-diag">Só diagnóstico</button></div>`:""}
      <input id="nv-sq" type="search" placeholder="Buscar serviço" style="margin-top:8px;width:min(320px,100%)">
      <div id="nv-sl" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin-top:8px;max-height:250px;overflow:auto"></div>
      <details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-weight:600">＋ Peças do estoque (opcional)</summary>
        <div class="row" style="margin-top:8px"><input id="nv-pq" list="dl-nvp" placeholder="Nome ou código da peça" style="flex:1;min-width:200px" autocomplete="off"><datalist id="dl-nvp"></datalist><button type="button" class="btn" id="nv-padd">Adicionar peça</button></div></details></section>
-   <section class="card nv-sec"><h2><span class="nv-n">4</span> ${n.tipo==="solta"?"Como a peça chegou":n.tipo==="pecas"?"Como as peças chegaram":"O que veio com o motor"}</h2>
-     <div class="row" id="nv-ent" style="gap:6px;flex-wrap:wrap;margin-top:8px">${ENT_ITENS.map(x=>`<button type="button" class="chip ${n.ent.has(x)?"on":""}" data-i="${h(x)}">${h(x)}</button>`).join("")}</div>
-     <input id="nv-eo" value="${h(n.entObs)}" placeholder="Observação: estado do motor, peças novas que o cliente trouxe…" style="margin-top:8px;width:100%">
-     <div style="margin-top:12px"><b>📷 Fotos do motor na chegada</b> <span class="muted" style="font-size:13px">(opcional · ficam na OS e no histórico)</span>
+   <section class="card nv-sec"><h2><span class="nv-n">4</span> ${n.modoApanha?"🚗 Vistoria do carro":n.tipo==="motor"&&n.carro?"🚗 Nota de apanha do carro":n.tipo==="solta"?"Como a peça chegou":n.tipo==="pecas"?"Como as peças chegaram":"O que veio com o motor"}</h2>
+     ${n.modoApanha?`<div id="nv-apw">${htmlApanha(n.apanha,"na")}</div>
+       <div class="card" style="margin-top:14px;border-color:var(--accent)"><h3 style="margin:0 0 6px">✍️ Autorização do cliente</h3>
+         <div><b>Qual serviço o cliente autoriza? *</b></div><div class="row" id="nv-sini" style="gap:8px;flex-wrap:wrap;margin-top:6px">${servIniOpcoes(n.linha).map(o=>`<button type="button" class="btn ${n.servIni===o.desc?"pri":""}" data-si="${h(o.desc)}" style="flex:1;min-width:140px;min-height:62px;flex-direction:column;gap:2px;white-space:normal;text-align:center"><b>${h(o.desc)}</b><span style="font-size:17px">${money(o.valor)}</span></button>`).join("")}</div>
+         <div class="banner" id="nv-termo" style="margin:10px 0 0;font-size:14px;line-height:1.45"></div>
+         <div style="margin-top:10px"><b>O cliente está aqui na loja?</b></div>
+         <div class="seg" id="nv-apcomo" style="margin-top:6px;flex-wrap:wrap">${[["papel","🧑 Está aqui: assina o papel"],["tela","📱 Está aqui: assina na tela"],["link","📲 Não está: assina pelo link"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${(n.apComo||"papel")===k?"on":""}" style="white-space:normal">${t}</button>`).join("")}</div>
+         <div class="muted" id="nv-apdica" style="font-size:13px;margin-top:6px"></div><div id="nv-aspw">${htmlBlocoAssinatura()}</div></div>`:n.tipo==="motor"&&n.carro?`<div id="nv-apsel"></div>`:""}
+     <div class="row" id="nv-ent" ${n.tipo==="motor"&&n.carro?"hidden":""} style="gap:6px;flex-wrap:wrap;margin-top:8px">${ENT_ITENS.map(x=>`<button type="button" class="chip ${n.ent.has(x)?"on":""}" data-i="${h(x)}">${h(x)}</button>`).join("")}</div>
+     <input id="nv-eo" value="${h(n.entObs)}" placeholder="Observação: estado do motor, peças novas que o cliente trouxe…" style="margin-top:8px;width:100%" ${n.tipo==="motor"&&n.carro?"hidden":""}>
+     <div style="margin-top:12px"><b>${n.modoApanha?"📷 Fotos do carro na chegada":"📷 Fotos do motor na chegada"}</b> <span class="muted" style="font-size:13px">${n.modoApanha?"(painel com o KM, avarias, lataria · ficam na nota e no histórico)":"(opcional · ficam na OS e no histórico)"}</span>
        <div class="nv-fotos" id="nv-fotos"></div>
        <button type="button" class="btn" id="nv-fadd" style="margin-top:8px" ${assets?"":"disabled"}>📷 Tirar / escolher fotos</button><input type="file" id="nv-finp" accept="image/*" multiple hidden></div></section>
-   <section class="card nv-sec"><h2><span class="nv-n">5</span> Prazo</h2>
+   <section class="card nv-sec" style="${n.modoApanha?"display:none":""}"><h2><span class="nv-n">5</span> Prazo</h2>
      <div class="form os" style="margin-top:8px">
        <div class="f wide" id="nv-cal"></div>
        <label class="f">Previsão de entrega<input id="nv-prev" type="date" value="${h(n.previsao)}"><span id="nv-sug" style="font-size:13px"></span></label>
@@ -4912,12 +5337,12 @@ SHELL.novaos = () => { if (!UI.nv) UI.nv = nvNovo(); const n=UI.nv, ger=direcao(
        <label class="f">Prioridade<select id="nv-pri"><option value="normal">Normal</option><option value="urgente" ${n.prioridade==="urgente"?"selected":""}>Urgente</option></select></label>`:""}
      </div></section>
   </div>
-  <aside class="nv-side card"><h2>🧾 Orçamento</h2><div id="nv-scli" class="muted" style="font-size:13px;margin:2px 0 8px"></div>
-    <div id="nv-ssel"></div><div id="nv-psel"></div>
-    <div class="nv-total"><span>TOTAL DA OS</span><b id="nv-tot">R$ 0,00</b></div>
+  <aside class="nv-side card"><h2>${n.modoApanha?"🚗 Nota de apanha":"🧾 Orçamento"}</h2><div id="nv-scli" class="muted" style="font-size:13px;margin:2px 0 8px"></div>
+    <div ${n.modoApanha?"hidden":""}><div id="nv-ssel"></div><div id="nv-psel"></div>
+    <div class="nv-total"><span>TOTAL DA OS</span><b id="nv-tot">R$ 0,00</b></div></div>
     <div id="nv-falta" class="muted" style="font-size:13px;margin:6px 0 10px"></div>
     <button class="btn lancar" id="nv-salvar" style="width:100%;justify-content:center">💾 Salvar orçamento</button>
-    <div class="muted" style="font-size:12px;margin:4px 0 10px;text-align:center">Fica salvo para mandar ao cliente. Ainda não vai para a oficina.</div>
+    <div class="muted" style="font-size:12px;margin:4px 0 10px;text-align:center">${n.modoApanha?"Fica salva com a vistoria. Depois você imprime e manda o PDF.":"Fica salvo para mandar ao cliente. Ainda não vai para a oficina."}</div>
     <button class="btn pri lancar" id="nv-ok" style="width:100%;justify-content:center">✅ Cliente aprovou · Lançar OS</button>
     <div class="muted" style="font-size:12px;margin:4px 0 10px;text-align:center">Vai para o gerente liberar para a oficina.</div>
     <button class="btn" id="nv-can" style="width:100%;justify-content:center">Cancelar</button></aside></div>`; };
@@ -4928,7 +5353,9 @@ function nvFalta(){ const n=UI.nv, c=nvCli(), f=[]; if (n.origemTipo && n.origem
   if (n.tipo==="solta"){ if (!n.solta || (n.solta==="Outra" && !n.soltaOutra.trim())) f.push("qual peça veio"); }
   else if (n.tipo==="pecas"){ if (!nvPecasM(n).length) f.push("quais peças vieram"); }
   else if (!n.motor.trim()) f.push("motor");
-  if (!n.servs.size) f.push(n.caminhoId==="rapido"&&n.caminhoMan?"o serviço a fazer (no modo ⚡ rápido)":"pelo menos 1 serviço");
+  if (n.modoApanha){ const g=f.filter(x=>x!=="motor"); if (!n.veiculo.trim()) g.push("veículo"); if (!n.problema.trim()) g.push("serviços solicitados pelo cliente"); if (!n.servIni) g.push("qual serviço o cliente autoriza (cabeçote ou motor completo)"); const fa=faltaApanha(n.apanha); if (fa.length) g.push("vistoria ("+fa.join(", ")+")"); return g; }
+  if (n.tipo==="motor" && n.carro && !n.apanhaId) f.push("escolher a nota de apanha deste carro");
+  if (!n.servs.size && !n.soEntrada) f.push(n.caminhoId==="rapido"&&n.caminhoMan?"o serviço a fazer (no modo ⚡ rápido)":"pelo menos 1 serviço");
   return f; }
 function nvCaminho(){ const n=UI.nv, w=$("#nv-camw"); if (!n||!w) return;
   const peca = n.tipo==="solta" ? (n.solta==="Outra"?(n.soltaOutra||""):(n.solta||"")) : "";
@@ -4959,7 +5386,8 @@ function nvCalendario(){ const n=UI.nv, w=$("#nv-cal"); if (!n||!w) return;
 }
 function confirm2Cal(){ toast("⚠️ Dia apertado: pela fila, é provável atrasar. Escolhido mesmo assim."); return true; }
 function nvAtualiza(){ if (!UI.nv || !$("#nv-tot")) return; $("#nv-tot").textContent = money(nvTot()); nvCaminho(); nvCalendario();
-  const c=nvCli(), v=UI.nv.novo; $("#nv-scli").innerHTML = c ? `${h(c.nome)} · ${h(c.telefone||"")}${UI.nv.motor?` · ${h(UI.nv.motor)}`:""}` : v&&v.nome ? `${h(v.nome)} · ${h(v.telefone||"")}${UI.nv.motor?` · ${h(UI.nv.motor)}`:""}` : "Cliente ainda não escolhido"; const f=nvFalta(); $("#nv-falta").textContent = f.length ? "Falta: "+f.join(", ") : "✔ Orçamento completo"; $("#nv-ok").disabled = !!f.length; $("#nv-salvar").disabled = !!f.length; }
+  const c=nvCli(), v=UI.nv.novo; $("#nv-scli").innerHTML = c ? `${h(c.nome)} · ${h(c.telefone||"")}${UI.nv.motor?` · ${h(UI.nv.motor)}`:""}` : v&&v.nome ? `${h(v.nome)} · ${h(v.telefone||"")}${UI.nv.motor?` · ${h(UI.nv.motor)}`:""}` : "Cliente ainda não escolhido"; const f=nvFalta(); $("#nv-falta").textContent = f.length ? "Falta: "+f.join(", ") : UI.nv.soEntrada ? "✔ Pronto para registrar a entrada" : "✔ Orçamento completo"; $("#nv-ok").disabled = !!f.length || !!UI.nv.soEntrada; $("#nv-salvar").disabled = !!f.length;
+  $("#nv-salvar").textContent = UI.nv.modoApanha ? "🚗 Salvar nota de apanha" : UI.nv.soEntrada ? "📥 Registrar a entrada" : "💾 Salvar orçamento"; $("#nv-ok").style.display = UI.nv.soEntrada||UI.nv.modoApanha ? "none" : ""; { const nx=$("#nv-ok").nextElementSibling; if (nx) nx.style.display = UI.nv.soEntrada||UI.nv.modoApanha ? "none" : ""; } if (UI.nv.modoApanha && f.length===0) $("#nv-falta").textContent="✔ Pronto para salvar a nota de apanha"; }
 async function nvSalvarCliente(silencioso){
   const n=UI.nv; if (!n || !n.novo) return null; const v=n.novo;
   if (!v.nome.trim() || !v.telefone){ if (!silencioso) toast("Preencha o nome e o WhatsApp com DDD."); return null; }
@@ -4971,7 +5399,8 @@ async function nvSalvarCliente(silencioso){
   if (UI.nv===n){ n.cliId=c.id; n.novo=null; if ($("#nv-cli")){ nvRenderCli(); nvAtualiza(); } }
   if (!silencioso){ toast(ex?`Esse cliente já estava cadastrado: ${ex.nome}`:"💾 Cliente salvo · agora o carro 🚗"); nvIrCarro(); }
   return c; }
-function nvIrCarro(){ setTimeout(()=>{ const i=$("#nv-vei"); if (!i) return; const sec=i.closest("section")||i; sec.scrollIntoView({behavior:"smooth", block:"start"}); sec.style.outline="3px solid var(--accent)"; setTimeout(()=>{ sec.style.outline=""; }, 2500); if (!(UI.nv&&UI.nv.tipo!=="motor")) i.focus({preventScroll:true}); }, 150); }
+function nvAssCli(){ const n=UI.nv; if (!n||!n.modoApanha) return; const cl=nvCli()||n.novo||{}; const dn=$("#as-n"), dd=$("#as-d"); if (dn && cl.nome) dn.value=cl.nome; if (dd && cl.doc) dd.value=fmtDoc(cl.doc); }
+function nvIrCarro(){ nvAssCli(); setTimeout(()=>{ const i=$("#nv-vei"); if (!i) return; const sec=i.closest("section")||i; sec.scrollIntoView({behavior:"smooth", block:"start"}); sec.style.outline="3px solid var(--accent)"; setTimeout(()=>{ sec.style.outline=""; }, 2500); if (!(UI.nv&&UI.nv.tipo!=="motor")) i.focus({preventScroll:true}); }, 150); }
 function nvRenderCli(){
   const n=UI.nv, c=nvCli(), el=$("#nv-cli");
   if (c){ const os=S.os.filter(o=>(o.clienteId===c.id||o.cliente===c.nome)&&visivelLoj(o)).sort((a,b)=>b.criadoEm-a.criadoEm), wa=foneWa(c.telefone);
@@ -5007,7 +5436,7 @@ function nvRenderCli(){
   $("#nv-cnovo").onclick=()=>{ const t=n.q.replace(/\D/g,"").length>=8; const dg=n.q.replace(/\D/g,""); n.novo={nome:t?"":n.q, telefone:"", ddd:t&&dg.length>=10?dg.slice(0,2):"", num:t?(dg.length>=10?dg.slice(2):dg):"", tipo:"comum", doc:"", cidade:""}; if (n.novo.ddd && n.novo.num) n.novo.telefone=`(${n.novo.ddd}) ${n.novo.num}`; nvRenderCli(); nvAtualiza(); setTimeout(()=>$(t?"#nc-n":"#nc-ddd").focus(),30); };
 }
 function nvPreencheCarro(v){ const set=(id,val)=>{ const i=$(id); if (!i) return; i.value=val||""; i.dispatchEvent(new Event("input",{bubbles:true})); i.dispatchEvent(new Event("change",{bubbles:true})); };
-  set("#nv-vei", v.veiculo); set("#nv-pla", v.placa); if ($("#nv-mot")) set("#nv-mot", v.motor); set("#nv-nmot", v.numMotor); }
+  set("#nv-vei", v.veiculo); set("#nv-pla", v.placa); if ($("#nv-mot")) set("#nv-mot", v.motor); set("#nv-nmot", v.numMotor); const bt=$("#na-bat"); if (bt && v.bateria && !bt.value) set("#na-bat", v.bateria); }
 function nvRenderServ(){
   const n=UI.nv, tab=precosDaLinha(n.linha), q=norm(($("#nv-sq")||{}).value||"");
   $("#nv-sl").innerHTML = tab.filter(p=>!q||norm(p.desc).includes(q)).map(p=>{ const on=n.servs.has(p.desc), sp=p.valor==null; return `<button type="button" class="fz-opt ${on?"on":""}" data-s="${h(p.desc)}" ${sp?"disabled style='opacity:.45'":""} style="padding:8px 10px"><b style="font-size:14px">${on?"✓ ":""}${h(p.desc)}</b><small>${sp?"sem preço · peça ao chefe":money(p.valor)}</small></button>`; }).join("") || `<div class="muted">${tab.length?"Nenhum serviço com esse nome.":"A tabela de preços está vazia. O chefe precisa cadastrar os serviços."}</div>`;
@@ -5032,6 +5461,21 @@ BIND.novaos = () => {
   nvRenderCli(); nvRenderServ();
   [["vei","veiculo"],["pla","placa"],["mot","motor"],["nmot","numMotor"],["pro","problema"],["eo","entObs"],["prev","previsao"]].forEach(([k,f])=>{ const e=$("#nv-"+k); if (e) e.oninput=()=>{ n[f]=e.value; nvAtualiza(); }; });
   maskPlaca($("#nv-pla")); maskMaiusc($("#nv-nmot"));
+  { const nc=$("#nv-carro"); if (nc) nc.onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; const v=b.dataset.k==="true"; if (v===!!n.carro) return; n.carro=v; montar(); }; }
+  { const aw=$("#nv-apw"); if (aw) ligarApanha(aw, "na", n.apanha, ()=>nvAtualiza()); }
+  { const pc=$("#nv-prochips"); if (pc) pc.onclick=e=>{ const b=e.target.closest("[data-pc]"); if(!b) return; const t=$("#nv-pro"); t.value = t.value.trim() ? t.value.trim()+"; "+b.dataset.pc : b.dataset.pc; n.problema=t.value; nvAtualiza(); }; }
+  if (n.modoApanha){ const opS=()=>servIniOpcoes(n.linha).find(o=>o.desc===n.servIni); if (n.servIni){ const o=opS(); n.desmVal=o?o.valor:n.desmVal; }
+    const veicTxt=()=>[n.veiculo, n.placa].filter(Boolean).join(" ");
+    UI.nvAss = null;
+    const cl0=nvCli(); UI.nvAss = $("#nv-aspw") ? ligarBlocoAssinatura(document, ()=>n.apComo==="tela"?"Pessoalmente":"nao", "", cl0?cl0.nome:(n.novo&&n.novo.nome)||"", cl0?cl0.doc:(n.novo&&n.novo.doc)||"") : null;
+    if ($("#nv-aspw")){ const it=$("#nv-aspw #as-termo"); if (it) it.remove(); const ad=$("#nv-aspw #as-dist"); if (ad) ad.remove(); }
+    const dica=()=>{ const d=$("#nv-apdica"); if (UI.nvAss) UI.nvAss.atual(); if (d) d.innerHTML = (n.apComo||"papel")==="tela" ? "📱 O cliente assina com o dedo aqui embaixo e coloca o CPF. A assinatura fica salva na nota e no histórico." : (n.apComo||"papel")==="link" ? (ponteUrl()?"📲 Depois de salvar, toque em <b>Enviar PDF + link</b>: o cliente recebe a nota em PDF e assina com o dedo no celular. A assinatura volta sozinha para a nota.":"⚠️ Para mandar o link, a ponte precisa estar ligada (Notas fiscais → 🔌 Ponte).") : "✍️ O cliente assina a <b>via do cliente (A3)</b>. Depois você manda a nota em <b>PDF pelo WhatsApp</b>."; }; dica();
+    const ac=$("#nv-apcomo"); if (ac) ac.onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; n.apComo=b.dataset.k; ac.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); dica(); };
+    const upT=()=>{ const t=$("#nv-termo"); if (t) t.textContent = n.servIni ? termoDesmontagem(veicTxt(), n.desmVal, n.servIni) : "Escolha acima qual serviço o cliente autoriza."; }; upT();
+    $("#nv-sini").onclick=e=>{ const b=e.target.closest("[data-si]"); if(!b) return; n.servIni=b.dataset.si; const o=opS(); n.desmVal=o?o.valor:0; $("#nv-sini").querySelectorAll("[data-si]").forEach(x=>x.classList.toggle("pri",x===b)); upT(); nvAtualiza(); };
+    ["#nv-vei","#nv-pla"].forEach(id=>{ const i=$(id); if (i) i.addEventListener("input", ()=>setTimeout(upT,0)); });
+  }
+  nvRenderApSel();
   $("#nv-tipo").onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b||b.dataset.k===n.tipo) return; n.tipo=b.dataset.k; if (n.tipo==="solta" && n.solta && n.solta!=="Outra") n.ent.add(n.solta); montar(); };
   const sl=$("#nv-solta"); if (sl) sl.onclick=e=>{ const b=e.target.closest("[data-sl]"); if(!b) return; if (n.solta && n.solta!=="Outra") n.ent.delete(n.solta); n.solta=b.dataset.sl; if (n.solta!=="Outra") n.ent.add(n.solta); sl.querySelectorAll("[data-sl]").forEach(x=>x.classList.toggle("on",x===b)); $("#nv-sol2").hidden=n.solta!=="Outra"; if (n.solta==="Outra") $("#nv-sol2").focus(); document.querySelectorAll("#nv-ent [data-i]").forEach(x=>x.classList.toggle("on", n.ent.has(x.dataset.i))); nvAtualiza(); };
   const s2=$("#nv-sol2"); if (s2) s2.oninput=()=>{ n.soltaOutra=s2.value; nvAtualiza(); };
@@ -5046,7 +5490,7 @@ BIND.novaos = () => {
   const mv=()=>{ const k=nz(n.veiculo), P=PESQ_MOT[k]; let {v,lista}=motoresDoVeiculo(n.veiculo); if (!lista.length && P && P.st==="ok"){ lista=P.lista.slice(); v=[P.marca||"", P.modelo||n.veiculo.trim()]; }
     const g = nz(n.veiculo).length>=3 ? ` <a href="${googleMotor(n.veiculo.trim())}" target="_blank" rel="noopener" class="btn sm" style="margin-left:4px">🔎 Conferir no Google</a>` : "";
     if (!lista.length && k.length>=3 && !P && mvK!==k){ clearTimeout(mvT); mvK=k; mvT=setTimeout(()=>{ mvK=null; if (nz(n.veiculo)===k) pesquisarMotores(n.veiculo, mv); else mv(); }, 900); }
-    $("#nv-mv").innerHTML = (!lista.length && k.length>=3 ? `<div class="muted" style="font-size:13px;margin-top:4px">${P&&P.st==="buscando"?"🔎 Pesquisando os motores desse veículo…":P&&P.st==="nada"?"Não achei com certeza os motores desse veículo. Confira no Google e digite o motor no campo ao lado: ele fica salvo para a próxima vez.":P&&P.st==="erro"?"Não deu para pesquisar agora. Confira no Google e digite o motor: ele fica salvo para a próxima vez.":"🔎 Vou pesquisar os motores desse veículo…"}${g}</div>` : lista.length ? `<div class="nv-mv"><span class="muted">${v?`Motores do <b style="color:var(--ink)">${h(v[0]+" "+v[1])}</b>`:"Motores já usados com esse carro"} · toque para escolher:</span> ${lista.map(m=>`<button type="button" class="chip ${norm(n.motor)===norm(m)?"on":""}" data-mv="${h(m)}">${h(m)}</button>`).join("")}${P&&P.st==="ok"?`<div class="muted" style="font-size:12px;margin-top:4px">Pesquisado automaticamente e salvo. Confira na plaqueta do motor.${g}</div>`:""}</div>` : ""); };
+    if (!$("#nv-mv")) return; $("#nv-mv").innerHTML = (!lista.length && k.length>=3 ? `<div class="muted" style="font-size:13px;margin-top:4px">${P&&P.st==="buscando"?"🔎 Pesquisando os motores desse veículo…":P&&P.st==="nada"?"Não achei com certeza os motores desse veículo. Confira no Google e digite o motor no campo ao lado: ele fica salvo para a próxima vez.":P&&P.st==="erro"?"Não deu para pesquisar agora. Confira no Google e digite o motor: ele fica salvo para a próxima vez.":"🔎 Vou pesquisar os motores desse veículo…"}${g}</div>` : lista.length ? `<div class="nv-mv"><span class="muted">${v?`Motores do <b style="color:var(--ink)">${h(v[0]+" "+v[1])}</b>`:"Motores já usados com esse carro"} · toque para escolher:</span> ${lista.map(m=>`<button type="button" class="chip ${norm(n.motor)===norm(m)?"on":""}" data-mv="${h(m)}">${h(m)}</button>`).join("")}${P&&P.st==="ok"?`<div class="muted" style="font-size:12px;margin-top:4px">Pesquisado automaticamente e salvo. Confira na plaqueta do motor.${g}</div>`:""}</div>` : ""); };
   $("#nv-vei").addEventListener("input", ()=>{ const v0=veicAchar(n.veiculo), v=(/scania/i.test(n.veiculo)||(v0&&/scania/i.test(v0[0]))) ? [v0?v0[0]:"Scania", v0?v0[1]:"", "scania", v0?v0[3]:[]] : v0; if (v && v[2]!==n.linha && !n.servs.size){ n.linha=v[2]; $("#nv-lin").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.k===n.linha)); nvRenderServ(); } mv(); });
   $("#nv-mot").addEventListener("input", mv);
   $("#nv-mv").onclick=e=>{ const b=e.target.closest("[data-mv]"); if(!b) return; n.motor=b.dataset.mv; $("#nv-mot").value=n.motor; mv(); nvAtualiza(); };
@@ -5057,7 +5501,9 @@ BIND.novaos = () => {
   $("#nv-sq").oninput=nvRenderServ;
   { const dg=$("#nv-diag"); if (dg) dg.onclick=()=>{ const tab=precosDaLinha(n.linha); const ach=re=>tab.find(p=>re.test(p.desc) && p.valor!=null); const L=n.tipo==="pecas"?[ach(/lavag/i)]:[ach(/desmont/i), ach(/lavag/i)]; const ok=L.filter(Boolean);
     if (!ok.length){ toast("Não achei Desmontagem/Lavagem na tabela de preços."); return; } n.servs.clear(); ok.forEach(p=>n.servs.set(p.desc,1)); n.diagnostico=true; nvRenderServ(); toast("Lançado só o diagnóstico. O resto vem da avaliação."); }; }
-  $("#nv-sl").onclick=e=>{ const b=e.target.closest("[data-s]"); if(!b||b.disabled) return; const d=b.dataset.s; n.diagnostico=false; n.servs.has(d)?n.servs.delete(d):n.servs.set(d,1); nvRenderServ(); };
+  const entUI=()=>{ const w=$("#nv-entw"); if (!w) return; w.style.borderLeft = n.soEntrada ? "5px solid var(--accent)" : ""; w.querySelector("span").innerHTML = n.soEntrada ? `📥 <b>Só a entrada.</b> A OS vai ser registrada <b>sem serviços</b>. Depois que a oficina avaliar, você abre a OS, coloca os serviços e manda o orçamento.` : `📥 <b>Ainda não sabe o que o motor precisa?</b> Registre <b>só a entrada</b> agora (cliente, carro, motor, peças que vieram). Os serviços você coloca depois da avaliação.`; const b=$("#nv-soent"); b.textContent = n.soEntrada ? "Voltar a escolher serviços" : "📥 Só a entrada (sem serviços)"; b.classList.toggle("pri", !n.soEntrada); };
+  { const se=$("#nv-soent"); if (se) se.onclick=()=>{ n.soEntrada=!n.soEntrada; if (n.soEntrada) n.servs.clear(); nvRenderServ(); entUI(); nvAtualiza(); }; }
+  $("#nv-sl").onclick=e=>{ const b=e.target.closest("[data-s]"); if(!b||b.disabled) return; const d=b.dataset.s; n.diagnostico=false; if (n.soEntrada){ n.soEntrada=false; entUI(); } n.servs.has(d)?n.servs.delete(d):n.servs.set(d,1); nvRenderServ(); };
   $("#nv-ssel").onclick=e=>{ const r=e.target.closest("[data-rm]"); if(r){ n.servs.delete(r.dataset.rm); nvRenderServ(); return; } const b=e.target.closest("[data-q]"); if(!b) return; const v=(n.servs.get(b.dataset.d)||1)+(+b.dataset.q); v<1?n.servs.delete(b.dataset.d):n.servs.set(b.dataset.d,v); nvRenderServ(); };
   $("#dl-nvp").innerHTML = S.pecas.map(p=>`<option value="${h(p.codigo?p.codigo+" · "+p.nome:p.nome)}">${p.qtd||0} no estoque · ${money(p.preco)}</option>`).join("");
   $("#nv-padd").onclick=()=>{ const v=$("#nv-pq").value.trim(); const p=S.pecas.find(x=>(x.codigo?x.codigo+" · "+x.nome:x.nome)===v) || S.pecas.find(x=>norm(x.nome)===norm(v)||norm(x.codigo||"")===norm(v)); if(!p){ toast("Escolha a peça da lista."); return; }
@@ -5092,6 +5538,7 @@ BIND.novaos = () => {
 FILL.novaos = () => { if (UI.nv && $("#nv-ok")) nvAtualiza(); };
 async function nvLancar(){
   const n=UI.nv; if (nvFalta().length){ toast("Falta: "+nvFalta().join(", ")); return; }
+  if (n.modoApanha) return salvarNotaApanha();
   const b=$(n.aprovou?"#nv-ok":"#nv-salvar"), txt0=b.textContent; b.disabled=true; b.textContent="Salvando…";
   const movidos=[], fotosEnv=[];
   try{
@@ -5100,13 +5547,17 @@ async function nvLancar(){
     if (!c) throw {code:"sem_cliente"};
     const tab=precosDaLinha(n.linha), servicos=[...n.servs.entries()].map(([d,q])=>{ const p=tab.find(x=>x.desc===d); return p?{desc:d, valor:Number(p.valor), qtd:q}:null; }).filter(Boolean);
     const agora=Date.now(), st = n.aprovou ? "aberta" : "orcamento";
-    const hist=[{em:agora, por:me.id, porNome:me.nome, txt: st==="orcamento" ? `Orçamento salvo por ${me.nome} · ${servicos.length} serviço(s) · ainda não lançado` : `OS lançada (cliente aprovou)${me.papel==="lojista"?" pelo lojista e enviada ao gerente":""} · ${servicos.length} serviço(s)`}];
+    const hist=[{em:agora, por:me.id, porNome:me.nome, txt: st==="orcamento" && n.soEntrada && !servicos.length ? `📥 Entrada registrada por ${me.nome} · sem serviços (aguardando a avaliação da oficina)` : st==="orcamento" ? `Orçamento salvo por ${me.nome} · ${servicos.length} serviço(s) · ainda não lançado` : `OS lançada (cliente aprovou)${me.papel==="lojista"?" pelo lojista e enviada ao gerente":""} · ${servicos.length} serviço(s)`}];
     const d={numero:await proxNumeroOS(), status:st, cliente:c.nome, clienteId:c.id, telefone:c.telefone||"", veiculo:n.veiculo.trim(), placa:n.placa.trim().toUpperCase(), motor:nvMotorTxt(n), numMotor:n.numMotor.trim().toUpperCase(), linha:n.linha, tipoServico:n.tipo, pecaSolta:n.tipo==="solta"?(n.solta==="Outra"?n.soltaOutra.trim():n.solta):"", ...(n.tipo==="pecas"?{pecasMotor:nvPecasM(n)}:{}), ...(n.tipo==="motor"&&n.qtdP?{qtdPecas:{...n.qtdP}}:{}), motorOrigem:n.tipo==="solta"?n.motor.trim():"",
       problema:n.problema.trim(), previsao:n.previsao, prioridade:n.prioridade, responsavel:n.responsavel, setor:n.setor, fichaId:"", servicos, pecas:[], fotos:[], desconto:0, criadoEm:agora, atualizadoEm:agora, ...autorDaSessao(), hist};
     if (n.origemTipo && n.origemTipo!=="cliente"){ const ref=String(n.origemNome).trim(); const osRef = n.origemTipo==="motor" ? S.os.find(o=>String(o.numero)===ref.replace(/\D/g,"")) : null;
       d.origem={tipo:n.origemTipo, nome:ref, osRef:osRef?osRef.id:"", osNum:osRef?osRef.numero:"", em:agora, porNome:me.nome}; hist.push({em:agora, por:me.id, porNome:me.nome, txt:`Origem: ${n.origemTipo==="empresa"?"veio da empresa "+ref:"veio de outro motor: "+(osRef?codOS(osRef)+" ("+(osRef.motor||"")+")":ref)}`}); }
     if (n.setor){ d.setorEm=agora; if (n.aprovou){ d.liberadaEm=agora; d.liberadaPorNome=me.nome; } }
     const f=fichaDaOS(d); if (f) d.fichaId=f.id;
+    const apN = (n.tipo==="motor" && n.carro && n.apanhaId) ? S.apanhas.find(x=>x.id===n.apanhaId) : null;
+    if (apN){ (apN.fotos||[]).forEach(f=>{ if (!d.fotos.some(x=>x.id===f.id)) d.fotos.push(Object.assign({}, f, {etapa:"Nota de apanha"})); }); d.carroFechado=true; d.apanhaId=apN.id; d.apanhaNum=apN.numero; d.apanha=Object.assign({}, apN.vistoria, {em:apN.em, por:apN.por, porNome:apN.porNome}); d.desmontagemNota=apN.desmontagem||0; d.servicoAutorizadoNota=apN.servicoAutorizado||""; if (apN.assinatura) d.assinaturaApanha=apN.assinatura;
+      hist.push({em:agora+2, por:me.id, porNome:me.nome, txt:`🚗 Aberta a partir da Nota de apanha ${codNA(apN)} (recebida por ${apN.porNome||""} em ${dt(apN.em)})`});
+      hist.push({em:agora+3, por:me.id, porNome:me.nome, txt:textoApanha(apN.vistoria||{itens:{}}, apN.porNome)+`\nServiços solicitados pelo cliente: ${apN.servicosSolicitados||"—"}\nServiço autorizado na entrada: ${apN.servicoAutorizado||"—"} · ${money(apN.desmontagem||0)}${apN.assinatura?` · assinada por ${apN.assinatura.nome} (${apN.assinatura.doc||""}) em ${dt(apN.assinatura.em)}`:" · SEM assinatura do cliente"}`}); }
     if (n.ent.size || n.entObs.trim()){ d.entrada={itens:ENT_ITENS.filter(x=>n.ent.has(x)), estado:[], outros:"", pecasCliente:"", obs:n.entObs.trim(), trouxe:c.nome, em:agora, por:me.id, porNome:me.nome}; hist.push({em:agora+1, por:me.id, porNome:me.nome, txt:`Ficha de entrada: ${d.entrada.itens.join(", ")||"—"}${d.entrada.obs?` · ${d.entrada.obs}`:""}`}); }
     if (n.aprovou){ d.lancadaEm=agora; d.lancadaPorNome=me.nome; const v=servicos.reduce((t,x)=>t+x.valor*x.qtd,0)+n.pecas.reduce((t,x)=>t+(x.p.preco||0)*x.q,0); d.aprovacoes=[{valor:v, servicos:servicos.map(x=>({...x})), pecas:n.pecas.map(x=>({nome:x.p.nome, qtd:x.q, preco:x.p.preco})), desconto:0, como:n.como, ...(n.assinatura?{assinatura:Object.assign({}, n.assinatura, {termo:n.assinatura.termo.replace("da OS  no", "da OS nº "+d.numero+" no")})}:{}), quem:c.nome, obs:"", em:agora, por:me.id, porNome:me.nome}]; hist.push({em:agora+2, por:me.id, porNome:me.nome, txt:`Cliente aprovou ${money(v)} · ${n.como}`}); }
     if (n.garantiaDe){ const g=S.os.find(x=>x.id===n.garantiaDe); d.garantiaDe=n.garantiaDe; hist.push({em:agora+3, por:me.id, porNome:me.nome, txt:`Retorno de garantia da OS ${g?codOS(g):""}`}); }
@@ -5118,7 +5569,9 @@ async function nvLancar(){
     { const cm=(n.tipo==="pecas"&&n.caminhoId==="pecas"?caminhoPara("pecas"):camPorId(n.caminhoId)) || caminhoPara(n.tipo, d.pecaSolta); if (cm) d.caminho={id:cm.id||"", nome:cm.nome, etapas:cm.etapas.map(g=>({s:g.slice()}))}; if (cm.aval!=null) d.caminho.aval=cm.aval; }
     if (!OFICINA){ delete d.caminho; d.setor=""; d.responsavel=""; }
     if (OFICINA && n.aprovou && !n.setor && d.caminho) iniciarCaminho(d);
-    await selarHist(d); const ref=await db.collection("os").add(d); aprenderVeiculo(n.veiculo, n.motor, n.linha);
+    if (n.soEntrada && !n.servs.size){ d.avaliacao={em:agora, por:me.id, porNome:me.nome}; d.status="orcamento"; }
+    await selarHist(d); const ref=await db.collection("os").add(d);
+    if (d.apanhaId) db.doc("apanhas/"+d.apanhaId).update({osId:ref.id, osNum:d.numero, osEm:agora, hist:(S.apanhas.find(x=>x.id===d.apanhaId)?.hist||[]).concat([{em:agora, porNome:me.nome, txt:`🔧 Virou a OS ${codOS(d)}`}])}).catch(()=>{}); aprenderVeiculo(n.veiculo, n.motor, n.linha);
     if (n.tipo!=="solta" && (d.veiculo||d.placa)) salvarCarro(S.clientes.find(x=>x.id===c.id)||c, {veiculo:d.veiculo, placa:d.placa, motor:n.motor.trim(), numMotor:d.numMotor, em:agora}).catch(()=>{});
     UI.nv=null; nvSucesso(Object.assign({id:ref.id}, d), c);
   }catch(err){ erro(err); b.disabled=false; b.textContent=txt0;
@@ -5127,21 +5580,25 @@ async function nvLancar(){
     if (movidos.length || fotosEnv.length) toast("A OS não foi salva. O estoque foi devolvido. Tente de novo."); }
 }
 function nvSucesso(o, c){
-  const wa=foneWa(c.telefone), sxAprovar=o.status==="orcamento", sxTk=(wa && ponteUrl() && (sxAprovar || !assinaturaOS(o))) ? novoToken() : null;
-  const sxMsg = sxTk ? msgComLinkAss(msgWhats(o, sxAprovar?"orcamento":"os"), sxAprovar, sxTk) : msgWhats(o, sxAprovar?"orcamento":"os");
-  abrirModal(`<h2 style="color:var(--ok)">${o.status==="orcamento"?`💾 Orçamento ${codOS(o)} salvo`:`✅ OS ${codOS(o)} lançada`}</h2>
+  const soEnt = !!o.avaliacao && !(o.servicos||[]).length;
+  const wa=foneWa(c.telefone), sxAprovar=o.status==="orcamento", sxTk=(!soEnt && wa && ponteUrl() && (sxAprovar || !assinaturaOS(o))) ? novoToken() : null;
+  const sxMsg = soEnt ? msgWhats(o, "entrada") : sxTk ? msgComLinkAss(msgWhats(o, sxAprovar?"orcamento":"os"), sxAprovar, sxTk) : msgWhats(o, sxAprovar?"orcamento":"os");
+  abrirModal(`<h2 style="color:var(--ok)">${soEnt?`📥 Entrada ${codOS(o)} registrada`:o.status==="orcamento"?`💾 Orçamento ${codOS(o)} salvo`:`✅ OS ${codOS(o)} lançada`}</h2>
+    ${soEnt?`<div class="banner" style="margin:0 0 8px">Agora é com a oficina. Quando souber o que o motor precisa: abra a OS → <b>＋ Adicionar serviços</b> → 💬 WhatsApp → <b>Orçamento</b>.</div>`:""}
     <div class="card" style="text-align:center;padding:12px;margin:0;border:2px dashed var(--accent)"><div class="muted" style="font-size:13px">${o.pecasMotor&&o.pecasMotor.length?"Número da OS (o mesmo em todas as peças)":`Escreva na ${o.pecaSolta?"peça":"peça / motor"}`}</div><div style="font-size:44px;font-weight:900;line-height:1.1">OS ${codOS(o)}</div><button class="btn sm" id="sx-etq" style="margin-top:6px">🏷️ Imprimir etiqueta</button>
       ${!o.pecasMotor&&!o.pecaSolta&&o.qtdPecas?`<div style="text-align:left;margin-top:8px;font-size:15px"><b>🔩 Peças deste motor:</b> ${h(txtPecasMotor(o))}<div class="muted" style="font-size:13px">Etiquetas: ${PECAS_MOTOR_ETQ.filter(pc=>qtdPeca(o,pc)>0).map(pc=>`<b class="mono">${h(letraPeca(pc))}-${h(String(o.numero))}</b>`).join(" · ")}</div><button class="btn sm" id="sx-etqp" style="margin-top:6px">🏷️ Imprimir etiquetas das peças</button></div>`:""}
       ${o.pecasMotor&&o.pecasMotor.length?`<div style="text-align:left;margin-top:8px;font-size:15px"><b>🧩 Escreva em cada peça:</b>${o.pecasMotor.map(pc=>`<div><b class="mono" style="font-size:20px">${h(letraPeca(pc))}-${h(String(o.numero))}</b> ${h(pc)}</div>`).join("")}<button class="btn sm" id="sx-etqp" style="margin-top:6px">🏷️ Imprimir etiquetas das peças</button></div>`:""}</div>
     <div style="font-size:16px">${h(c.nome)} · ${h(o.motor)} · <b>${money(totalOS(o))}</b></div>
     <div class="muted">${o.status==="orcamento"?"Ainda <b>não foi lançado</b> na oficina. Mande para o cliente. Quando ele aprovar, vá em <b>Minhas OS</b> e toque em <b>✅ Aprovou · Lançar</b>.":(!OFICINA?"Lançada: está <b>na oficina</b>. Quando ficar pronta, o gerente marca <b>🏁 Pronta</b> e aparece para você avisar o cliente.":o.setor?`Lançada e já está na tela do mecânico (${h(o.setor)}).`:"Lançada. Toque em <b>🔧 Mandar para a oficina</b> na OS, ou o gerente manda.")}</div>
     <div class="grid" style="gap:8px">
-      ${wa?`<a class="btn ${o.status==="orcamento"||sxTk?"pri":""}" id="sx-wa" style="justify-content:center;flex-direction:column;gap:2px" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(sxMsg)}">💬 ${o.status==="orcamento"?"Mandar orçamento":"Mandar a OS"} no WhatsApp${sxTk?`<span style="font-size:13px;font-weight:600">✍️ já vai com o link para o cliente ${sxAprovar?"aprovar e assinar":"assinar"}</span>`:""}</a>`:`<div class="banner warn" style="margin:0">Cliente sem telefone: não dá para mandar no WhatsApp.</div>`}
+      ${wa?`<a class="btn ${o.status==="orcamento"||sxTk?"pri":""}" id="sx-wa" style="justify-content:center;flex-direction:column;gap:2px" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(sxMsg)}">💬 ${soEnt?"Avisar o cliente que recebemos":o.status==="orcamento"?"Mandar orçamento":"Mandar a OS"} no WhatsApp${sxTk?`<span style="font-size:13px;font-weight:600">✍️ já vai com o link para o cliente ${sxAprovar?"aprovar e assinar":"assinar"}</span>`:""}</a>`:`<div class="banner warn" style="margin:0">Cliente sem telefone: não dá para mandar no WhatsApp.</div>`}
+      <div class="row" style="gap:8px"><button class="btn" id="sx-a3o" style="flex:1;justify-content:center;min-height:52px">🖨 Via da oficina<br><small>(A3 · marcar X)</small></button><button class="btn" id="sx-a3c" style="flex:1;justify-content:center;min-height:52px">🖨 Via do cliente<br><small>(A3 · entrada)</small></button></div>
       ${o.entrada?`<button class="btn" id="sx-ent" style="justify-content:center">🖨 Imprimir ficha de entrada para o cliente assinar</button>`:""}
       <button class="btn" id="sx-ver" style="justify-content:center">Ver a OS</button></div>
     <div class="acts"><button class="btn pri" id="sx-ok">Fechar</button></div>`, m=>{
     const fim=(ver)=>{ fecharModal(); if (ver){ location.hash = ehLojista()?"lojas":"os"; setTimeout(()=>abrirOS(o.id),50); } else { location.hash = ehLojista()?"lojas":"os"; } };
     $("#sx-ok",m).onclick=()=>fim(false); $("#sx-ver",m).onclick=()=>fim(true);
+    $("#sx-a3o",m).onclick=()=>imprimirVia(o,"ofi"); $("#sx-a3c",m).onclick=()=>imprimirVia(o,"cli");
     const e=$("#sx-ent",m); if (e) e.onclick=()=>folhaParaImprimir("Ficha de entrada · OS #"+o.numero, `ficha-entrada-os-${o.numero}.html`, htmlEntradaImp(o));
     $("#sx-etq",m).onclick=()=>imprimirEtiqueta(o);
     { const sw=$("#sx-wa",m); if (sw && sxTk){ let feito=false; sw.addEventListener("click", ()=>{ if (feito) return; feito=true; criarPedidoAssinatura(o, sxTk, sxAprovar).catch(err=>{ feito=false; erro(err); }); }); } }
@@ -6181,7 +6638,7 @@ async function baixarCSVHG(){
 /* ---------- EQUIPE ---------- */
 /* Começar a usar de verdade: apaga tudo que foi teste (OS, clientes, caixa, banco, funcionários…) e deixa só a configuração.
    Só o dono. Pede para digitar APAGAR. Não mexe em: tabela de preços, setores, caminhos, checklists, máquinas, Gmails liberados. */
-const ZERAR_COLS = ["os","clientes","pecas","vendas","movimentos","compras","caixa","autorizacoes","despesas","reclamacoes","contagens","comprasFeitas","banco","conferencias","maquininha","contasPagar","avisosChefe","lixeira","falhas","pedidosSenha","sessoes","arquivos","arquivosPartes","assinaturasPendentes"];
+const ZERAR_COLS = ["apanhas","os","clientes","pecas","vendas","movimentos","compras","caixa","autorizacoes","despesas","reclamacoes","contagens","comprasFeitas","banco","conferencias","maquininha","contasPagar","avisosChefe","lixeira","falhas","pedidosSenha","sessoes","arquivos","arquivosPartes","assinaturasPendentes"];
 function formZerar(){ if (!ehDono()){ toast("Só o dono."); return; }
   const outros=S.funcionarios.filter(f=>f.id!==me.id && !f.dono);
   abrirModal(`<h2>🧹 Começar a usar de verdade</h2>
