@@ -44,6 +44,8 @@ details.dcol>summary h2{margin:0;font-size:17px;flex:1} details.dcol>summary::af
 details.dcol:not([open]){padding-top:12px;padding-bottom:12px} .dsub{color:var(--muted);font-size:13px;font-weight:400}
 .nav .badge{background:#ffffff26;border-radius:10px;padding:0 7px;font-size:12px}
 .me{margin-top:auto;border-top:1px solid #ffffff1f;padding:12px 10px 0;font-size:13px}
+.troca-fixa{display:none}
+@media (max-width:900px){ .troca-fixa{display:block;position:fixed;top:10px;right:10px;z-index:45;background:var(--side,#111);color:#fff;border:2px solid var(--accent);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:700;box-shadow:0 2px 10px #0008;cursor:pointer} body.tem-modal .troca-fixa, body[data-v="novaos"] .troca-fixa{display:none} }
 .me b{display:block;color:var(--ink);font-size:15px}
 .me button{margin-top:8px;background:none;border:1px solid #ffffff33;color:var(--side-ink);border-radius:6px;padding:5px 10px;cursor:pointer}
 main{padding:22px 26px 60px;min-width:0}
@@ -921,7 +923,8 @@ function telaLogin(){
   // não redesenha a tela de entrada se nada mudou (senão apaga a senha que está sendo digitada)
   const FBc = window.__FB || null, meuEmail = FBc && !FBc.compartilhado ? FBc.email : "";
   const ligados = meuEmail ? ativos.filter(f=>emailsDe(f).includes(meuEmail)) : [];
-  const listaWho = (ligados.length ? ligados : ativos).filter(f=>(NIVEL[f.papel]||1) <= nivelAparelho());
+  /* quem está ligado ao Gmail deste aparelho aparece primeiro; os outros aparecem também (sempre com senha) */
+  const listaWho = ligados.concat(ativos.filter(f=>!ligados.includes(f))).filter(f=>(NIVEL[f.papel]||1) <= nivelAparelho());
   const mostraRestrito = nivelAparelho() >= 3 || ligados.some(f=>senhaAdm(f.papel));
   const chave = JSON.stringify([ativos.map(f=>[f.id,f.nome,f.papel,f.foto||"",f.pin,emailsDe(f).join(",")]), loginSel, !!loaded.funcionarios]);
   if (chave===loginChave && $("#flog")) return;
@@ -946,7 +949,7 @@ function telaLogin(){
   }
   $("#root").innerHTML = `<div class="login"><div class="card">
     <div style="background:var(--side);color:var(--ink);margin:-16px -16px 0;padding:16px;border-radius:10px 10px 0 0;border-bottom:3px solid var(--accent)">${logoEmp()?`<img src="${logoEmp()}" alt="" style="display:block;max-width:180px;max-height:80px;object-fit:contain;margin-bottom:8px">`:""}<h1>${h(nomeEmp())} <span style="color:var(--accent)">●</span></h1><p class="muted" style="margin:8px 0 0">Quem está usando este computador?</p></div>
-    <div class="who">${listaWho.filter(f=>(OFICINA&&f.papel==="funcionario")||f.papel==="lojista"||f.papel==="logistica").sort((a,b)=>(a.papel==="lojista"?0:1)-(b.papel==="lojista"?0:1)).map(f=>`<button type="button" data-id="${f.id}" class="${loginSel===f.id?"on":""}">${avatar(f)}${h(f.nome)}<small>${h(PAPEL[f.papel]||"")}</small></button>`).join("")}</div>
+    <div class="who">${listaWho.filter(f=>(OFICINA&&f.papel==="funcionario")||f.papel==="lojista"||f.papel==="logistica").sort((a,b)=>(ligados.includes(b)?1:0)-(ligados.includes(a)?1:0) || (a.papel==="lojista"?0:1)-(b.papel==="lojista"?0:1)).map(f=>`<button type="button" data-id="${f.id}" class="${loginSel===f.id?"on":""}">${avatar(f)}${h(f.nome)}<small>${h(PAPEL[f.papel]||"")}</small></button>`).join("")}</div>
     ${mostraRestrito?`<button type="button" id="restrito" class="btn sm" style="align-self:flex-end;opacity:.75">🔒 Acesso restrito</button>`:""}
     <form id="flog" class="grid" ${loginSel?"":"hidden"}><label class="f">${loginSel==="__restrito"?"Senha do acesso restrito":`Senha de ${h((S.funcionarios.find(x=>x.id===loginSel)||{}).nome||"")}`}<input id="lp" class="pin" type="password" maxlength="20" autocomplete="off" autocapitalize="off"></label>
     <button type="submit" class="btn pri" style="width:100%;padding:14px;font-size:18px;justify-content:center">Entrar</button>
@@ -1010,7 +1013,7 @@ function montar(){
   if (me.papel==="funcionario"){ montarFunc(); return; }
   let v = (location.hash||"").slice(1);
   if (!pode(v)) v = inicio(me.papel);
-  view = v;
+  view = v; try{ document.body.dataset.v = v; }catch(e){}
   $("#root").innerHTML = `<div class="app">
     <aside class="side"><div class="brand">${logoEmp()?`<img src="${logoEmp()}" alt="" style="display:block;max-width:150px;max-height:70px;object-fit:contain;margin-bottom:6px">`:""}${h(nomeEmp())}<small>Linha leve e pesada</small></div>
       <nav class="nav">${(()=>{ const lk=k=>`<a href="#${k}" class="${k===view?"on":""}" data-v="${k}">${VIEWS[k].t}<span class="badge" data-b="${k}" hidden></span></a>`;
@@ -1018,8 +1021,8 @@ function montar(){
         const NP = me.papel==="chefe" ? NAV_PRINCIPAL : NAV_GERENTE; const pri=ks.filter(k=>NP.includes(k)), mais=ks.filter(k=>!NP.includes(k));
         return pri.map(lk).join("") + (mais.length?`<details class="nav-mais" ${mais.includes(view)?"open":""}><summary>Mais</summary>${mais.map(lk).join("")}</details>`:""); })()}</nav>
       <div class="me"><b>${h(me.nomeReal||me.nome)}</b>${h(cargo(me))}<br><button id="sair" type="button">Trocar usuário</button><br><button id="reclamar" type="button">📣 Reclamar do sistema</button></div>
-    </aside><main id="main"></main></div>`;
-  $("#reclamar").onclick=formReclamacao;
+    </aside><main id="main"></main><button type="button" id="sair2" class="troca-fixa" title="Trocar usuário">👤 Trocar usuário</button></div>`;
+  $("#reclamar").onclick=formReclamacao; $("#sair2").onclick=()=>$("#sair").click();
   $("#sair").addEventListener("click", ()=>{ loginChave=""; sairSessao("saiu"); me=null; osAberta=null; UI.osEscopo=null; history.replaceState(null,"",location.pathname); telaLogin(); });
   $("#main").innerHTML = aviso() + (osAberta ? shellOSDet() : SHELL[view]());
   (osAberta ? bindOSDet : BIND[view])();
@@ -3443,7 +3446,7 @@ const APANHA_ITENS = ["Retrovisor elétrico","Retrovisor comum","Frisos laterais
   "Macaco","Chave de rodas","Protetor cárter","Suspensão","Ar-condicionado","Freios","Sistema elétrico","Embreagem","Sistema injeção"];
 const APANHA_AVARIAS = ["Para-choque dianteiro","Capô","Para-brisa","Teto","Para-lama diant. esq.","Para-lama diant. dir.","Porta diant. esq.","Porta diant. dir.","Porta tras. esq.","Porta tras. dir.","Lateral tras. esq.","Lateral tras. dir.","Tampa traseira","Para-choque traseiro","Vidros","Faróis / lanternas","Retrovisores","Rodas / pneus"];
 const APANHA_COMB = ["R","1/4","1/2","3/4","C"];
-const apanhaNova = () => ({km:"", cor:"", ano:"", chassi:"", bateria:"", comb:"", pneus:"", itens:{}, avarias:[], compl:"", obs:""});
+const apanhaNova = () => ({km:"", cor:"", ano:"", chassi:"", bateria:"", comb:"", pneus:"", itens:{}, avarias:[], avariasDesc:"", compl:"", obs:""});
 function faltaApanha(a){ const f=[]; if (!a) return ["nota de apanha"]; if (!String(a.km||"").trim()) f.push("KM"); if (!a.comb) f.push("combustível"); if (!a.pneus) f.push("pneus");
   const sem=APANHA_ITENS.filter(x=>!(a.itens||{})[x]).length; if (sem) f.push(`${sem} itens da vistoria sem S/N/A`); return f; }
 function htmlApanha(a, px){ const sn=(x)=>{ const v=(a.itens||{})[x]||""; return `<div class="ap-it"><span>${h(x)}</span><span class="ap-b" data-it="${h(x)}">${["S","N","A"].map(k=>`<button type="button" data-v="${k}" class="${v===k?"on ap-"+k:""}">${k}</button>`).join("")}</span></div>`; };
@@ -3453,12 +3456,13 @@ function htmlApanha(a, px){ const sn=(x)=>{ const v=(a.itens||{})[x]||""; return
     <div><b>🛞 Pneus *</b><div class="seg" id="${px}-pn" style="margin-top:4px">${["Novos","Bons","Ruins"].map(k=>`<button type="button" data-k="${k}" class="${a.pneus===k?"on":""}">${k}</button>`).join("")}</div></div></div>
   <div style="margin-top:12px" class="row"><b style="flex:1">🔍 Acessórios e estado · <span style="color:#16a34a">S</span> tem · <span class="muted">N</span> não tem · <span style="color:#dc2626">A</span> avariado/incompleto *</b><button type="button" class="btn sm" id="${px}-tudoS">Marcar o resto como S</button></div>
   <div class="ap-grid" id="${px}-itens" style="margin-top:6px">${APANHA_ITENS.map(sn).join("")}</div><div id="${px}-cont" class="muted" style="font-size:13px;margin-top:4px"></div>
-  <div style="margin-top:12px"><b>🚗 Avarias na lataria</b> <span class="muted" style="font-size:13px">(toque onde tem risco, amassado ou quebra · tire foto também)</span><div class="row" id="${px}-av" style="gap:6px;flex-wrap:wrap;margin-top:6px">${APANHA_AVARIAS.map(x=>`<button type="button" class="chip ${(a.avarias||[]).includes(x)?"on":""}" data-av="${h(x)}">${h(x)}</button>`).join("")}</div></div>
+  <div style="margin-top:12px"><b>🚗 Avarias na lataria</b> <span class="muted" style="font-size:13px">(toque onde tem risco, amassado ou quebra · tire foto também)</span><div class="row" id="${px}-av" style="gap:6px;flex-wrap:wrap;margin-top:6px">${APANHA_AVARIAS.map(x=>`<button type="button" class="chip ${(a.avarias||[]).includes(x)?"on":""}" data-av="${h(x)}">${h(x)}</button>`).join("")}</div>
+    <label class="f wide" style="margin-top:8px">✏️ Descreva as avarias <span class="muted">(onde, tamanho, tipo: risco, amassado, trinca, peça faltando…)</span><textarea id="${px}-avd" rows="3" placeholder="Ex.: risco de 20 cm na porta dianteira esquerda; farol direito trincado; retrovisor esquerdo solto">${h(a.avariasDesc||"")}</textarea></label></div>
   <label class="f" style="margin-top:10px">Serviços complementares / como o carro chegou<input id="${px}-cp" value="${h(a.compl)}" placeholder="Ex.: veio de reboque, ar-condicionado não funciona"></label>
   <label class="f" style="margin-top:6px">Observações<input id="${px}-ob" value="${h(a.obs)}"></label>`; }
 function ligarApanha(m, px, a, mudou){ const ch=()=>{ const c=$("#"+px+"-cont",m); if (c){ const sem=APANHA_ITENS.filter(x=>!a.itens[x]).length, av=APANHA_ITENS.filter(x=>a.itens[x]==="A").length; c.textContent = sem ? `Faltam ${sem} itens` : `✔ Vistoria completa${av?` · ${av} avariado(s)`:""}`; } if (mudou) mudou(); };
   const bind=(id,k,up)=>{ const i=$("#"+px+"-"+id,m); if (i) i.addEventListener("input", ()=>{ a[k]=up?i.value.toUpperCase():i.value; ch(); }); };
-  bind("km","km"); bind("cor","cor"); bind("ano","ano"); bind("chs","chassi",true); bind("bat","bateria"); bind("cp","compl"); bind("ob","obs");
+  bind("km","km"); bind("cor","cor"); bind("ano","ano"); bind("chs","chassi",true); bind("bat","bateria"); bind("cp","compl"); bind("ob","obs"); bind("avd","avariasDesc");
   const seg=(id,k)=>{ $("#"+px+"-"+id,m).onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; a[k]=b.dataset.k; $("#"+px+"-"+id,m).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); ch(); }; }; seg("comb","comb"); seg("pn","pneus");
   $("#"+px+"-itens",m).onclick=e=>{ const b=e.target.closest("[data-v]"); if(!b) return; const g=b.parentElement, it=g.dataset.it, v=b.dataset.v; a.itens[it] = a.itens[it]===v ? "" : v; g.querySelectorAll("button").forEach(x=>{ const on=x.dataset.v===a.itens[it]; x.className = on ? "on ap-"+x.dataset.v : ""; }); ch(); };
   $("#"+px+"-tudoS",m).onclick=()=>{ APANHA_ITENS.forEach(x=>{ if (!a.itens[x]) a.itens[x]="S"; }); m.querySelectorAll(`#${px}-itens .ap-b`).forEach(g=>g.querySelectorAll("button").forEach(x=>{ const on=x.dataset.v===a.itens[g.dataset.it]; x.className = on ? "on ap-"+x.dataset.v : ""; })); ch(); };
@@ -3486,26 +3490,29 @@ function htmlApanhaImp(a){ if (!a) return ""; const mk=x=>{ const v=a.itens[x]||
   <div style="display:flex;gap:30px;margin:8px 0;font-size:17px"><span><b>⛽ Combustível:</b> ${APANHA_COMB.map(k=>`<span class="bx" style="width:auto;padding:0 4px">${a.comb===k?"■ ":""}${k}</span>`).join(" ")}</span><span><b>🛞 Pneus:</b> ${["Novos","Bons","Ruins"].map(k=>`<span class="bx">${a.pneus===k?"X":""}</span>${k}`).join(" &nbsp; ")}</span></div>
   <div style="font-size:13px;margin-bottom:4px"><b>S</b> = sim, existente · <b>N</b> = não existente · <b>A</b> = avariado ou incompleto</div>
   <style>.apt td{height:22px !important;padding:0 6px}</style><div style="display:flex;gap:10px">${cols.map(c=>`<table class="apt" style="font-size:13px"><tr><th>Item</th><th>S</th><th>N</th><th>A</th></tr>${c.map(x=>`<tr><td style="height:19px;padding:0 6px">${h(x)}</td>${mk(x)}</tr>`).join("")}</table>`).join("")}</div>
-  <p style="font-size:16px;margin:8px 0 0"><b>Avarias na lataria:</b> ${h((a.avarias||[]).join(", ")||"nenhuma marcada")}</p>${a.compl?`<p style="font-size:16px;margin:4px 0 0"><b>Serviços complementares / como chegou:</b> ${h(a.compl)}</p>`:""}${a.obs?`<p style="font-size:16px;margin:4px 0 0"><b>Observações:</b> ${h(a.obs)}</p>`:""}`; }
+  <p style="font-size:16px;margin:8px 0 0"><b>Avarias na lataria:</b> ${h((a.avarias||[]).join(", ")||"nenhuma marcada")}</p>${a.avariasDesc?`<p style="font-size:16px;margin:4px 0 0"><b>Descrição das avarias:</b> ${h(a.avariasDesc)}</p>`:""}${a.compl?`<p style="font-size:16px;margin:4px 0 0"><b>Serviços complementares / como chegou:</b> ${h(a.compl)}</p>`:""}${a.obs?`<p style="font-size:16px;margin:4px 0 0"><b>Observações:</b> ${h(a.obs)}</p>`:""}`; }
 /* texto completo da nota de apanha para o histórico (tudo que foi marcado) */
 const codNA = a => a ? "NA-"+String(a.numero).padStart(4,"0") : "";
 async function proxNumeroApanha(){ let n=0; await comTrava("config/contadorApanha", async ref=>{ const sn=await ref.get(); const ult=sn.exists?Number(sn.data().ultimo)||0:0; n=Math.max(ult, ...S.apanhas.map(a=>Number(a.numero)||0))+1; await ref.set({ultimo:n, em:Date.now(), porNome:me.nome}); }); return n; }
 /* serviço que o cliente autoriza na entrada (os valores vêm da tabela; se não tiver, usa os combinados) */
 const servIniOpcoes = linha => (typeof PRECOS_INICIAIS!=="undefined"?PRECOS_INICIAIS:[]).map(p=>{ const t=precosDaLinha(linha||"leve").find(x=>norm(x.desc)===norm(p.desc)); return {desc:p.desc, valor:t?Number(t.valor):p.valor}; });
 const desmTabela = linha => { const p=precosDaLinha(linha||"leve").find(x=>/desmont|avalia/i.test(x.desc)); return p?Number(p.valor):null; };
-const termoDesmontagem = (veic, valor, serv) => `Autorizo a ${nomeEmp()} a fazer o ${String(serv||"serviço").toLowerCase()} do veículo ${veic||""}, no valor de ${money(valor||0)}. Peças e serviços a mais que forem encontrados na desmontagem serão informados no orçamento, para a minha aprovação antes de serem feitos.`;
+const servTxtNota = a => a.servicoAutorizado ? a.servicoAutorizado+(a.desmontagem?" ("+money(a.desmontagem)+")":"") : "Vistoria (sem serviço autorizado ainda)";
+const parseValor = t => { const v=Number(String(t||"").replace(/[^\d,.-]/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",",".")); return isFinite(v)&&v>0?Math.round(v*100)/100:0; };
+const termoSemServico = veic => `Declaro que deixei o veículo ${veic||""} na ${nomeEmp()} para avaliação, conferi a vistoria acima e estou de acordo. Nenhum serviço foi autorizado ainda: o orçamento será passado antes de qualquer serviço.`;
+const termoDesmontagem = (veic, valor, serv) => `Autorizo a ${nomeEmp()} a fazer o seguinte serviço: ${String(serv||"serviço").replace(/^\w/,c=>c.toLowerCase())}, no veículo ${veic||""}${Number(valor)>0?", no valor de "+money(valor):", com o valor a combinar no orçamento"}. Peças e serviços a mais que forem encontrados na desmontagem serão informados no orçamento, para a minha aprovação antes de serem feitos.`;
 function novaNotaApanha(clienteId){ UI.nv = nvNovo("motor"); UI.nv.modoApanha=true; UI.nv.carro=true; if (clienteId) UI.nv.cliId=clienteId; location.hash="#novaos"; }
 async function salvarNotaApanha(){ const n=UI.nv, b=$("#nv-salvar");
   { const cl=nvCli()||n.novo||{}; const dn=$("#as-n"), dd=$("#as-d"); if (dn && !dn.value.trim() && cl.nome) dn.value=cl.nome; if (dd && !dd.value.trim() && cl.doc) dd.value=fmtDoc(cl.doc); }
   const la = UI.nvAss ? UI.nvAss.ler() : {ok:true, ass:null}; if (!la.ok) return; const veicTxt=[n.veiculo, n.placa].filter(Boolean).join(" ");
-  if (la.ass) la.ass.termo = termoDesmontagem(veicTxt, n.desmVal, n.servIni);
+  if (la.ass) la.ass.termo = String(n.servIni||"").trim() ? termoDesmontagem(veicTxt, n.desmVal, String(n.servIni).trim()) : termoSemServico(veicTxt);
   b.disabled=true; b.textContent="Salvando…";
   try{ let c=nvCli(); if (!c) c=await nvSalvarCliente(true); if (!c) throw {code:"sem_cliente"};
     const agora=Date.now(), numero=await proxNumeroApanha();
     const d={numero, cliente:c.nome, clienteId:c.id, telefone:c.telefone||"", veiculo:n.veiculo.trim(), placa:n.placa.trim().toUpperCase(), motor:n.motor.trim(), numMotor:n.numMotor.trim(), linha:n.linha,
       servicosSolicitados:n.problema.trim(), vistoria:JSON.parse(JSON.stringify(n.apanha)), fotos:[], em:agora, por:me.id, porNome:me.nome, osId:"", osNum:"",
-      servicoAutorizado:n.servIni||"", desmontagem:Number(n.desmVal)||0, termoDesmontagem:termoDesmontagem(veicTxt, n.desmVal, n.servIni), assinatura:la.ass||null, assinaComo:n.apComo||"papel",
-      hist:[{em:agora, porNome:me.nome, txt:textoApanha(n.apanha, me.nome)}, {em:agora+1, porNome:me.nome, txt: la.ass ? `✍️ ${la.ass.nome} (${la.ass.doc}) assinou na tela autorizando ${n.servIni} · ${money(n.desmVal)}` : `✍️ Serviço autorizado na entrada: ${n.servIni} · ${money(n.desmVal)} (${(n.apComo||"papel")==="link"?"cliente não estava na loja: vai assinar pelo link no WhatsApp":"assinatura do cliente no papel"})`}]};
+      servicoAutorizado:String(n.servIni||"").trim(), desmontagem:Number(n.desmVal)||0, servicoOutro:!!n.servOutro, termoDesmontagem:String(n.servIni||"").trim()?termoDesmontagem(veicTxt, n.desmVal, String(n.servIni).trim()):termoSemServico(veicTxt), assinatura:la.ass||null, assinaComo:n.apComo||"papel",
+      hist:[{em:agora, porNome:me.nome, txt:textoApanha(n.apanha, me.nome)}, {em:agora+1, porNome:me.nome, txt: (()=>{ const sv=String(n.servIni||"").trim(), sx=sv?(sv+(n.desmVal?" · "+money(n.desmVal):"")):"só a vistoria (nenhum serviço autorizado ainda)"; return la.ass ? `✍️ ${la.ass.nome} (${la.ass.doc}) assinou na tela: ${sx}` : `✍️ Autorizado na entrada: ${sx} (${(n.apComo||"papel")==="link"?"cliente não estava na loja: vai assinar pelo link no WhatsApp":"assinatura do cliente no papel"})`; })()}]};
     if (n.fotos.length && assets){ b.textContent="Enviando fotos…";
       for (const f of n.fotos){ try{ const blob = f.file.type==="image/gif" ? f.file : await comprimir(f.file); const r=await assets.upload(blob, {type:blob.type||"image/jpeg"}); const em=Date.now();
         d.fotos.push({id:r.id, em, por:me.id, porNome:me.nome, etapa:"Nota de apanha"}); d.hist.push({em, porNome:me.nome, txt:"📷 Foto do carro na chegada", foto:r.id}); }catch(err){ toast("Uma foto não foi enviada. Coloque de novo em ✏️ Corrigir a vistoria."); } } }
@@ -3584,9 +3591,9 @@ async function pdfNotaApanha(a){ const P=pdfNovo(), c=S.clientes.find(x=>x.id===
   const rot={S:"Tem",N:"Não tem",A:"AVARIADO"}, its=APANHA_ITENS.map(x=>[x, rot[(v.itens||{})[x]]||"-"]), metade=Math.ceil(its.length/2), linhas=[];
   for (let i=0;i<metade;i++){ const l=[its[i][0], its[i][1], (its[metade+i]||["",""])[0], (its[metade+i]||["",""])[1]]; l.cor=[null, its[i][1]==="AVARIADO"?[200,0,0]:null, null, (its[metade+i]||[])[1]==="AVARIADO"?[200,0,0]:null]; linhas.push(l); }
   P.tabela(["Item","Situação","Item","Situação"], linhas, [34,16,34,16], {sz:8.5});
-  P.gap(4); P.para("Avarias na lataria: "+((v.avarias||[]).join(", ")||"nenhuma marcada"), {sz:10, b:true}); if (v.compl) P.para("Como chegou / serviços complementares: "+v.compl, {sz:10}); if (v.obs) P.para("Observações: "+v.obs, {sz:10});
+  P.gap(4); P.para("Avarias na lataria: "+((v.avarias||[]).join(", ")||"nenhuma marcada"), {sz:10, b:true}); if (v.avariasDesc) P.para("Descrição das avarias: "+v.avariasDesc, {sz:10}); if (v.compl) P.para("Como chegou / serviços complementares: "+v.compl, {sz:10}); if (v.obs) P.para("Observações: "+v.obs, {sz:10});
   P.h2("Serviços solicitados pelo cliente"); P.para(a.servicosSolicitados||"-", {sz:10.5});
-  if (a.servicoAutorizado){ P.gap(6); P.need(30); P.y-=26; P.borda(P.M, P.y, P.W-2*P.M, 24, 1.4); P.txt(`Serviço autorizado: ${a.servicoAutorizado}  -  ${money(a.desmontagem||0)}`, P.M+8, P.y+8, 12.5, true); P.gap(4); P.para(a.termoDesmontagem||"", {sz:9.5}); }
+  if (a.servicoAutorizado){ P.gap(6); P.need(30); P.y-=26; P.borda(P.M, P.y, P.W-2*P.M, 24, 1.4); P.txt(`Serviço autorizado: ${a.servicoAutorizado}${a.desmontagem?"  -  "+money(a.desmontagem):""}`, P.M+8, P.y+8, 12.5, true); P.gap(4); P.para(a.termoDesmontagem||"", {sz:9.5}); }
   P.gap(4); P.para(TERMO_APANHA, {sz:9, b:true}); P.para(`Autorizo a ${nomeEmp()} a consultar o meu cadastro junto aos órgãos competentes, como SPC e Serasa, bem como executar os serviços necessários acima descritos.`, {sz:9});
   P.gap(4); P.kv([["Recebido por",a.porNome||"-"],["Data da entrada",dt(a.em)],["Data da saída",a.saidaEm?dt(a.saidaEm):"___/___/______"]]);
   const as=a.assinatura?await paraJpeg(a.assinatura.img, 500):null; P.need(70); P.gap(as?4:40);
@@ -3618,11 +3625,11 @@ async function compartilharPdf(bytes, nome, texto, fone){ const file=new File([b
   toast("📄 PDF baixado. No WhatsApp, toque no 📎 e anexe o arquivo "+nome); return "download"; }
 async function criarPedidoAssinaturaNota(a, tk){ const agora=Date.now();
   await db.doc("assinaturasPendentes/"+tk).set({tipo:"apanha", apanhaId:a.id, osId:null, codigo:codNA(a), cliente:String(a.cliente||"").split(" ")[0], motor:[a.veiculo,a.placa].filter(Boolean).join(" ")+(a.motor?" · motor "+a.motor:""), valor:Number(a.desmontagem)||0, aprovar:false,
-    servicos:a.servicoAutorizado?[a.servicoAutorizado+": "+money(a.desmontagem||0)]:[], pecas:[], previsao:"", termo:a.termoDesmontagem||termoDesmontagem([a.veiculo,a.placa].filter(Boolean).join(" "), a.desmontagem, a.servicoAutorizado), empresa:nomeEmp(), criadoEm:agora, expira:agora+7*864e5, porNome:me.nome, usado:false});
+    servicos:a.servicoAutorizado?[a.servicoAutorizado+(a.desmontagem?": "+money(a.desmontagem):"")]:["Só a vistoria de entrada (nenhum serviço autorizado ainda)"], pecas:[], previsao:"", termo:a.termoDesmontagem||termoDesmontagem([a.veiculo,a.placa].filter(Boolean).join(" "), a.desmontagem, a.servicoAutorizado), empresa:nomeEmp(), criadoEm:agora, expira:agora+7*864e5, porNome:me.nome, usado:false});
   await db.doc("apanhas/"+a.id).update({assinaturaPedido:{token:tk, em:agora, porNome:me.nome}, hist:(a.hist||[]).concat([{em:agora, porNome:me.nome, txt:"📲 Link para o cliente assinar a nota pelo celular enviado por "+me.nome}])}); }
 async function enviarPdfNota(a, comLink){ try{ toast("Preparando o PDF…"); const b=await pdfNotaApanha(a);
     let lk=""; if (comLink && !a.assinatura){ if (!ponteUrl()) toast("⚠️ Sem a ponte ligada não dá para mandar o link. Vai só o PDF."); else { const tk=novoToken(); await criarPedidoAssinaturaNota(a, tk); lk=ponteUrl()+"?assinar="+tk; a.hist=(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"📲 Link para o cliente assinar a nota pelo celular enviado por "+me.nome}]); a.assinaturaPedido={token:tk, em:Date.now(), porNome:me.nome}; } }
-    const msg=`Olá, ${String(a.cliente||"").split(" ")[0]}! Aqui é ${me.nome}, da ${nomeEmp()}.\nSegue a Nota de apanha ${codNA(a)} do seu ${a.veiculo||"veículo"}${a.placa?" ("+a.placa+")":""}, com a vistoria da entrada.${a.servicoAutorizado?`\nServiço autorizado: ${a.servicoAutorizado} · ${money(a.desmontagem||0)}.`:""}${lk?`\n\n👉 Para autorizar, toque no link, confira e assine com o dedo:\n${lk}\n(o link vale 7 dias)`:"\nVamos avaliar e mandamos o orçamento por aqui. 👍"}`;
+    const msg=`Olá, ${String(a.cliente||"").split(" ")[0]}! Aqui é ${me.nome}, da ${nomeEmp()}.\nSegue a Nota de apanha ${codNA(a)} do seu ${a.veiculo||"veículo"}${a.placa?" ("+a.placa+")":""}, com a vistoria da entrada.${a.servicoAutorizado?`\nServiço autorizado: ${a.servicoAutorizado}${a.desmontagem?" · "+money(a.desmontagem):""}.`:""}${lk?`\n\n👉 Para autorizar, toque no link, confira e assine com o dedo:\n${lk}\n(o link vale 7 dias)`:"\nVamos avaliar e mandamos o orçamento por aqui. 👍"}`;
     const r=await compartilharPdf(b, `Nota-de-apanha-${codNA(a)}.pdf`, msg, a.telefone); if (r!=="cancel") db.doc("apanhas/"+a.id).update({pdfEnviadoEm:Date.now(), hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"📲 Nota em PDF enviada ao cliente pelo WhatsApp"}])}).catch(()=>{}); }catch(err){ erro(err); } }
 async function enviarPdfOrcamento(o){ try{ toast("Preparando o PDF…"); const b=await pdfOrcamentoOS(o);
     const msg=`Olá, ${String(o.cliente||"").split(" ")[0]}! Aqui é ${me.nome}, da ${nomeEmp()}.\nSegue o ${o.status==="orcamento"?"orçamento":"resumo da OS"} ${codOS(o)} do ${o.veiculo||o.motor||"seu motor"}: total ${money(totalOS(o))}.${o.status==="orcamento"?"\nPode responder por aqui se aprova. 👍":""}`;
@@ -3652,18 +3659,18 @@ function verNotaApanha(a){ const o=a.osId?S.os.find(x=>x.id===a.osId):null;
     <div style="display:grid;gap:8px"><div class="row" style="gap:8px"><button class="btn pri" data-na="imp" style="flex:1;justify-content:center;min-height:52px">🖨 Via do cliente (A3)</button><button class="btn pri" data-na="ofi" style="flex:1;justify-content:center;min-height:52px">🖨 Via da oficina (A3)</button></div>
     ${!podeAbrirOS()||SEM_OS()?"":o?`<button class="btn" data-na="os" style="justify-content:center;min-height:48px">Abrir a OS ${codOS(o)}</button>`:`<button class="btn" data-na="nova" style="justify-content:center;min-height:48px">🔧 Abrir a OS desta nota</button>`}
     <button class="btn" data-na="pdf" style="justify-content:center;min-height:52px;background:#1fa855;border-color:#1fa855;color:#fff">📲 Enviar a nota em PDF pelo WhatsApp</button>
-    ${a.assinatura?`<div class="card" style="padding:8px 12px">✅ ${h(a.servicoAutorizado||"Serviço")} (${money(a.desmontagem||0)}) autorizado e assinado por <b>${h(a.assinatura.nome)}</b>${a.assinatura.doc?" ("+h(a.assinatura.doc)+")":""} ${a.assinatura.remota?"<b>pelo link no celular</b>":""} em ${dt(a.assinatura.em)}<br><img src="${a.assinatura.img}" alt="Assinatura" data-na="zoom" style="max-height:60px;background:#fff;border-radius:6px;padding:3px 8px;margin-top:4px;cursor:zoom-in"></div>`
-     : a.assinadoPapel?`<div class="card" style="padding:8px 12px">✅ ${h(a.servicoAutorizado||"Serviço")} (${money(a.desmontagem||0)}) · cliente <b>assinou o papel</b> (confirmado por ${h(a.assinadoPapel.porNome)} em ${dt(a.assinadoPapel.em)})</div>`
-     : `${a.assinaturaPedido?`<div class="banner" style="margin:0">⏳ Link para assinar enviado por ${h(a.assinaturaPedido.porNome||"")} em ${dt(a.assinaturaPedido.em)} · esperando o cliente assinar</div>`:""}
+    ${a.assinatura?`<div class="card" style="padding:8px 12px">✅ ${h(servTxtNota(a))} autorizado e assinado por <b>${h(a.assinatura.nome)}</b>${a.assinatura.doc?" ("+h(a.assinatura.doc)+")":""} ${a.assinatura.remota?"<b>pelo link no celular</b>":""} em ${dt(a.assinatura.em)}<br><img src="${a.assinatura.img}" alt="Assinatura" data-na="zoom" style="max-height:60px;background:#fff;border-radius:6px;padding:3px 8px;margin-top:4px;cursor:zoom-in"></div>`
+     : a.assinadoPapel?`<div class="card" style="padding:8px 12px">✅ ${h(servTxtNota(a))} · cliente <b>assinou o papel</b> (confirmado por ${h(a.assinadoPapel.porNome)} em ${dt(a.assinadoPapel.em)})</div>`
+     : a.cancelada ? "" : `${a.assinaturaPedido?`<div class="banner" style="margin:0">⏳ Link para assinar enviado por ${h(a.assinaturaPedido.porNome||"")} em ${dt(a.assinaturaPedido.em)} · esperando o cliente assinar</div>`:""}
         <button class="btn" data-na="link" style="justify-content:center;min-height:48px">📲 ${a.assinaturaPedido?"Mandar o link de novo":"Cliente não está aqui: mandar link para assinar"}</button>
         <button class="btn" data-na="ass" style="justify-content:center;min-height:48px">📱 Cliente está aqui: assinar na tela agora</button>
         <button class="btn" data-na="papel" style="justify-content:center;min-height:48px;border-color:var(--warn)">✍️ Cliente assinou o papel? Toque para confirmar</button>`}
     ${a.cancelada?"":`<button class="btn" data-na="ed" style="justify-content:center">✏️ Corrigir a vistoria</button>`}
-    ${a.cancelada?(ehChefe()?`<button class="btn" data-na="reab" style="justify-content:center">↩️ Desfazer o cancelamento</button>`:""):`<button class="btn danger" data-na="canc" style="justify-content:center">❌ Cancelar esta nota</button>`}</div>
+    ${a.cancelada?(ehChefe()?`<button class="btn" data-na="reab" style="justify-content:center">↩️ Desfazer o cancelamento</button><button class="btn danger" data-na="apagar" style="justify-content:center">🗑 Apagar de vez (vai para a lixeira)</button>`:""):`<button class="btn danger" data-na="canc" style="justify-content:center">❌ Cancelar esta nota</button>`}</div>
     ${(a.fotos||[]).length?`<div style="margin-top:10px"><b>📷 Fotos da chegada (${a.fotos.length})</b><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${a.fotos.map(f=>`<a href="#" data-blobhref="${h(f.id)}" target="_blank" rel="noopener"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(f.id)}" alt="Foto" style="width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"></a>`).join("")}</div></div>`:""}
     <details style="margin-top:10px"><summary><b>🕘 Histórico da nota</b></summary><ul class="hist">${(a.hist||[]).slice().reverse().map(x=>`<li><div class="t num">${dt(x.em)}<br>${h(x.porNome||"")}</div><div style="white-space:pre-wrap">${h(x.txt)}${x.foto?`<br><a href="#" data-blobhref="${h(x.foto)}" target="_blank" rel="noopener"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-blob="${h(x.foto)}" alt="Foto" style="max-width:160px;max-height:110px;border-radius:6px;margin-top:4px"></a>`:""}</div></li>`).join("")}</ul></details>
     <div class="acts"><button class="btn" id="vn-x">Fechar</button></div>`, m=>{ $("#vn-x",m).onclick=fecharModal;
-    m.addEventListener("click", e=>{ const b=e.target.closest("[data-na]"); if(!b) return; const k=b.dataset.na; fecharModal(); setTimeout(()=>{ if(k==="imp") imprimirNotaApanha(a); if(k==="ofi") imprimirOficinaNota(a); if(k==="os") abrirOS(o.id); if(k==="nova") abrirOSdaNota(a); if(k==="ed") formEditarNota(a); if(k==="ass") formAssinarNota(a); if(k==="canc") formCancelarNota(a); if(k==="reab") reabrirNota(a); if(k==="pdf") enviarPdfNota(a, !a.assinatura && !a.assinadoPapel && a.assinaComo==="link"); if(k==="link") enviarPdfNota(a, true); if(k==="zoom") ampliarAss({__rot:"Nota "+codNA(a)}, a.assinatura); if(k==="papel") db.doc("apanhas/"+a.id).update({assinadoPapel:{em:Date.now(), por:me.id, porNome:me.nome}, hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"✍️ Cliente assinou a nota no papel (confirmado por "+me.nome+")"}])}).then(()=>toast("✅ Marcado como assinado")).catch(erro); },120); }); }); }
+    m.addEventListener("click", e=>{ const b=e.target.closest("[data-na]"); if(!b) return; const k=b.dataset.na; fecharModal(); setTimeout(()=>{ if(k==="imp") imprimirNotaApanha(a); if(k==="ofi") imprimirOficinaNota(a); if(k==="os") abrirOS(o.id); if(k==="nova") abrirOSdaNota(a); if(k==="ed") formEditarNota(a); if(k==="ass") formAssinarNota(a); if(k==="canc") formCancelarNota(a); if(k==="apagar") apagarNota(a); if(k==="reab") reabrirNota(a); if(k==="pdf") enviarPdfNota(a, !a.assinatura && !a.assinadoPapel && a.assinaComo==="link"); if(k==="link") enviarPdfNota(a, true); if(k==="zoom") ampliarAss({__rot:"Nota "+codNA(a)}, a.assinatura); if(k==="papel") db.doc("apanhas/"+a.id).update({assinadoPapel:{em:Date.now(), por:me.id, porNome:me.nome}, hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"✍️ Cliente assinou a nota no papel (confirmado por "+me.nome+")"}])}).then(()=>toast("✅ Marcado como assinado")).catch(erro); },120); }); }); }
 function formCancelarNota(a){
   abrirModal(`<h2>❌ Cancelar a nota ${codNA(a)}</h2><p style="margin:0 0 8px">${h(a.cliente)} · ${h(a.veiculo||"")} ${h(a.placa||"")}</p>
     <p class="muted" style="margin:0 0 8px">A nota <b>não é apagada</b>: fica marcada como cancelada, com o motivo, e continua no histórico. O link de assinatura (se tiver) para de valer.</p>
@@ -3677,6 +3684,9 @@ function formCancelarNota(a){
         if (a.assinaturaPedido && a.assinaturaPedido.token && !a.assinatura) db.doc("assinaturasPendentes/"+a.assinaturaPedido.token).update({usado:true, cancelada:true}).catch(()=>{});
         auditar("Notas de apanha", codNA(a)+" cancelada", null, {motivo});
         fecharModal(); toast("❌ Nota "+codNA(a)+" cancelada"); }catch(err){ b.disabled=false; erro(err); } }; }); }
+async function apagarNota(a){ if (!ehChefe()){ toast("Só o chefe apaga de vez."); return; } if (!a.cancelada){ toast("Primeiro cancele a nota."); return; }
+  if (!(await perguntar(`Apagar de vez a nota ${codNA(a)} (${a.cliente})?\n\nEla sai da lista e do histórico do cliente e vai para a Lixeira (Registros e backup → 🗑 Lixeira), onde o chefe ainda pode restaurar.`, "🗑 Apagar de vez"))) return;
+  try{ await apagarComLixeira("apanhas/"+a.id, Object.assign({}, a, {nome:codNA(a)+" · "+(a.cliente||"")})); auditar("Notas de apanha", codNA(a)+" apagada de vez", {cancelada:a.cancelada.motivo}, {lixeira:"apagado"}); toast("🗑 Nota "+codNA(a)+" foi para a lixeira"); }catch(err){ erro(err); } }
 async function reabrirNota(a){ if (!ehChefe()){ toast("Só o chefe desfaz o cancelamento."); return; } if (!(await perguntar("Desfazer o cancelamento da nota "+codNA(a)+"? Ela volta a valer.", "Desfazer"))) return;
   try{ await db.doc("apanhas/"+a.id).update({cancelada:null, hist:(a.hist||[]).concat([{em:Date.now(), porNome:me.nome, txt:"↩️ Cancelamento desfeito por "+me.nome}])}); toast("Nota reaberta"); }catch(err){ erro(err); } }
 function formAssinarNota(a){ const c=S.clientes.find(x=>x.id===a.clienteId)||{}; const termo=a.termoDesmontagem||termoDesmontagem([a.veiculo,a.placa].filter(Boolean).join(" "), a.desmontagem, a.servicoAutorizado);
@@ -3705,7 +3715,7 @@ function veiculosCompletos(c){ const M=new Map(), chave=x=>(String(x.placa||"").
     if (extra) extra(v); M.set(k, v); };
   (c.veiculos||[]).forEach(x=>junta({veiculo:x.veiculo, placa:String(x.placa||"").toUpperCase(), ano:x.ano, motor:x.motor, bateria:x.bateria}, x.em||0));
   (SEM_OS()?[]:S.os).filter(o=>o.clienteId===c.id || (!o.clienteId && o.cliente===c.nome)).forEach(o=>junta({veiculo:o.veiculo, placa:String(o.placa||"").toUpperCase(), motor:o.motor, linha:linhaN(o.linha)}, o.criadoEm||0, v=>v.os.push(codOS(o))));
-  S.apanhas.filter(a=>a.clienteId===c.id).forEach(a=>{ const t=a.vistoria||{}; junta({veiculo:a.veiculo, placa:String(a.placa||"").toUpperCase(), motor:a.motor, linha:linhaN(a.linha), ano:t.ano, bateria:t.bateria, cor:t.cor, chassi:t.chassi, km:t.km?(t.km+" (em "+new Date(a.em||0).toLocaleDateString("pt-BR")+")"):"", comb:t.comb, pneus:t.pneus, avarias:(t.avarias||[]).join(", ")}, a.em||0, v=>v.notas.push(codNA(a))); });
+  S.apanhas.filter(a=>a.clienteId===c.id).forEach(a=>{ const t=a.vistoria||{}; junta({veiculo:a.veiculo, placa:String(a.placa||"").toUpperCase(), motor:a.motor, linha:linhaN(a.linha), ano:t.ano, bateria:t.bateria, cor:t.cor, chassi:t.chassi, km:t.km?(t.km+" (em "+new Date(a.em||0).toLocaleDateString("pt-BR")+")"):"", comb:t.comb, pneus:t.pneus, avarias:[(t.avarias||[]).join(", "), t.avariasDesc].filter(Boolean).join(" · ")}, a.em||0, v=>v.notas.push(codNA(a))); });
   return [...M.values()].map(v=>{ Object.keys(v).filter(k=>k.startsWith("_t_")).forEach(k=>delete v[k]); return v; }); }
 const CAMPOS_VEIC = [["veiculo","Veículo"],["placa","Placa"],["ano","Ano"],["cor","Cor"],["chassi","Chassi"],["motor","Motor"],["bateria","Bateria (modelo e dados)"],["linha","Linha"],["km","KM"],["comb","Combustível (última entrada)"],["pneus","Pneus"],["avarias","Avarias na lataria (última entrada)"]];
 function textoVeiculo(v){ return CAMPOS_VEIC.filter(([k])=>v[k]).map(([k,t])=>`${t}: ${v[k]}`).concat(v.notas.length?["Notas de apanha: "+v.notas.join(", ")]:[], v.os.length?["OS: "+v.os.join(", ")]:[]).join("\n"); }
@@ -3746,6 +3756,7 @@ function textoApanha(a, quem){ const L=v=>APANHA_ITENS.filter(x=>(a.itens||{})[x
     `➖ Não tem (N): ${L("N").join(", ")||"—"}`,
     `⚠️ Avariado/incompleto (A): ${L("A").join(", ")||"—"}`,
     `Lataria com avaria: ${(a.avarias||[]).join(", ")||"nenhuma"}`,
+    ...(a.avariasDesc?[`Descrição das avarias: ${a.avariasDesc}`]:[]),
     ...(a.compl?[`Serviços complementares / como chegou: ${a.compl}`]:[]), ...(a.obs?[`Observações: ${a.obs}`]:[])].join("\n"); }
 const TERMO_APANHA = `ATENÇÃO: A EMPRESA NÃO SE RESPONSABILIZA POR ARMAS, JOIAS, PEÇAS OU QUALQUER TIPO DE MATERIAL QUE NÃO TENHA SIDO DEVIDAMENTE RECONHECIDO OU CITADO PELO CLIENTE DURANTE A ENTREGA DO VEÍCULO EM NOSSA OFICINA.`;
 const ENT_ITENS = ["Bloco","Cabeçote","Virabrequim","Bielas","Pistões","Comando de válvulas","Volante","Bomba de óleo","Bomba d'água","Cárter","Tampa de válvulas","Coletor de admissão","Coletor de escape","Turbina","Bicos injetores","Bomba injetora","Polias","Motor de partida","Alternador","Parafusos"];
@@ -5372,7 +5383,8 @@ SHELL.novaos = () => { if (ehLojista() && LOJISTA_TESTE && !(UI.nv && UI.nv.modo
    <section class="card nv-sec"><h2><span class="nv-n">4</span> ${n.modoApanha?"🚗 Vistoria do carro":n.tipo==="motor"&&n.carro?"🚗 Nota de apanha do carro":n.tipo==="solta"?"Como a peça chegou":n.tipo==="pecas"?"Como as peças chegaram":"O que veio com o motor"}</h2>
      ${n.modoApanha?`<div id="nv-apw">${htmlApanha(n.apanha,"na")}</div>
        <div class="card" style="margin-top:14px;border-color:var(--accent)"><h3 style="margin:0 0 6px">✍️ Autorização do cliente</h3>
-         <div><b>Qual serviço o cliente autoriza? *</b></div><div class="row" id="nv-sini" style="gap:8px;flex-wrap:wrap;margin-top:6px">${servIniOpcoes(n.linha).map(o=>`<button type="button" class="btn ${n.servIni===o.desc?"pri":""}" data-si="${h(o.desc)}" style="flex:1;min-width:140px;min-height:62px;flex-direction:column;gap:2px;white-space:normal;text-align:center"><b>${h(o.desc)}</b><span style="font-size:17px">${money(o.valor)}</span></button>`).join("")}</div>
+         <div><b>Qual serviço o cliente autoriza?</b> <span class="muted" style="font-size:13px">(opcional · toque de novo para desmarcar)</span></div><div class="row" id="nv-sini" style="gap:8px;flex-wrap:wrap;margin-top:6px">${servIniOpcoes(n.linha).map(o=>`<button type="button" class="btn ${!n.servOutro&&n.servIni===o.desc?"pri":""}" data-si="${h(o.desc)}" style="flex:1;min-width:140px;min-height:62px;flex-direction:column;gap:2px;white-space:normal;text-align:center"><b>${h(o.desc)}</b><span style="font-size:17px">${money(o.valor)}</span></button>`).join("")}<button type="button" class="btn ${n.servOutro?"pri":""}" data-si="__outro" style="flex:1;min-width:140px;min-height:62px;flex-direction:column;gap:2px;white-space:normal;text-align:center"><b>✏️ Outro serviço</b><span style="font-size:13px">descrever</span></button></div>
+         <div id="nv-soutw" ${n.servOutro?"":"hidden"} style="margin-top:8px"><div class="grid2"><label class="f wide">Qual serviço? *<textarea id="nv-sout" rows="2" placeholder="Ex.: só trocar a junta do cabeçote e retificar a face">${h(n.servOutro?n.servIni:"")}</textarea></label><label class="f">Valor (opcional)<input id="nv-sval" inputmode="decimal" placeholder="R$ 0,00" value="${n.servOutro&&n.desmVal?String(n.desmVal).replace(".",","):""}"></label></div></div>
          <div class="banner" id="nv-termo" style="margin:10px 0 0;font-size:14px;line-height:1.45"></div>
          <div style="margin-top:10px"><b>O cliente está aqui na loja?</b></div>
          <div class="seg" id="nv-apcomo" style="margin-top:6px;flex-wrap:wrap">${[["papel","🧑 Está aqui: assina o papel"],["tela","📱 Está aqui: assina na tela"],["link","📲 Não está: assina pelo link"]].map(([k,t])=>`<button type="button" data-k="${k}" class="${(n.apComo||"papel")===k?"on":""}" style="white-space:normal">${t}</button>`).join("")}</div>
@@ -5409,7 +5421,7 @@ function nvFalta(){ const n=UI.nv, c=nvCli(), f=[]; if (n.origemTipo && n.origem
   if (n.tipo==="solta"){ if (!n.solta || (n.solta==="Outra" && !n.soltaOutra.trim())) f.push("qual peça veio"); }
   else if (n.tipo==="pecas"){ if (!nvPecasM(n).length) f.push("quais peças vieram"); }
   else if (!n.motor.trim()) f.push("motor");
-  if (n.modoApanha){ const g=f.filter(x=>x!=="motor"); if (!n.veiculo.trim()) g.push("veículo"); if (!n.problema.trim()) g.push("serviços solicitados pelo cliente"); if (!n.servIni) g.push("qual serviço o cliente autoriza (cabeçote ou motor completo)"); const fa=faltaApanha(n.apanha); if (fa.length) g.push("vistoria ("+fa.join(", ")+")"); return g; }
+  if (n.modoApanha){ const g=f.filter(x=>x!=="motor"); if (!n.veiculo.trim()) g.push("veículo"); if (!n.problema.trim()) g.push("serviços solicitados pelo cliente"); if (n.servOutro && !String(n.servIni||"").trim()) g.push("descrever o outro serviço (ou desmarque)"); const fa=faltaApanha(n.apanha); if (fa.length) g.push("vistoria ("+fa.join(", ")+")"); return g; }
   if (n.tipo==="motor" && n.carro && !n.apanhaId) f.push("escolher a nota de apanha deste carro");
   if (!n.servs.size && !n.soEntrada) f.push(n.caminhoId==="rapido"&&n.caminhoMan?"o serviço a fazer (no modo ⚡ rápido)":"pelo menos 1 serviço");
   return f; }
@@ -5527,8 +5539,15 @@ BIND.novaos = () => {
     if ($("#nv-aspw")){ const it=$("#nv-aspw #as-termo"); if (it) it.remove(); const ad=$("#nv-aspw #as-dist"); if (ad) ad.remove(); }
     const dica=()=>{ const d=$("#nv-apdica"); if (UI.nvAss) UI.nvAss.atual(); if (d) d.innerHTML = (n.apComo||"papel")==="tela" ? "📱 O cliente assina com o dedo aqui embaixo e coloca o CPF. A assinatura fica salva na nota e no histórico." : (n.apComo||"papel")==="link" ? (ponteUrl()?"📲 Depois de salvar, toque em <b>Enviar PDF + link</b>: o cliente recebe a nota em PDF e assina com o dedo no celular. A assinatura volta sozinha para a nota.":"⚠️ Para mandar o link, a ponte precisa estar ligada (Notas fiscais → 🔌 Ponte).") : "✍️ O cliente assina a <b>via do cliente (A3)</b>. Depois você manda a nota em <b>PDF pelo WhatsApp</b>."; }; dica();
     const ac=$("#nv-apcomo"); if (ac) ac.onclick=e=>{ const b=e.target.closest("[data-k]"); if(!b) return; n.apComo=b.dataset.k; ac.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); dica(); };
-    const upT=()=>{ const t=$("#nv-termo"); if (t) t.textContent = n.servIni ? termoDesmontagem(veicTxt(), n.desmVal, n.servIni) : "Escolha acima qual serviço o cliente autoriza."; }; upT();
-    $("#nv-sini").onclick=e=>{ const b=e.target.closest("[data-si]"); if(!b) return; n.servIni=b.dataset.si; const o=opS(); n.desmVal=o?o.valor:0; $("#nv-sini").querySelectorAll("[data-si]").forEach(x=>x.classList.toggle("pri",x===b)); upT(); nvAtualiza(); };
+    const upT=()=>{ const t=$("#nv-termo"); if (t) t.textContent = String(n.servIni||"").trim() ? termoDesmontagem(veicTxt(), n.desmVal, n.servIni) : termoSemServico(veicTxt()); }; upT();
+    $("#nv-sini").onclick=e=>{ const b=e.target.closest("[data-si]"); if(!b) return; const k=b.dataset.si;
+      if (k==="__outro"){ if (n.servOutro){ n.servOutro=false; n.servIni=""; n.desmVal=0; } else { n.servOutro=true; n.servIni=($("#nv-sout")||{}).value||""; n.desmVal=parseValor(($("#nv-sval")||{}).value); } }
+      else if (!n.servOutro && n.servIni===k){ n.servIni=""; n.desmVal=0; }
+      else { n.servOutro=false; n.servIni=k; const o=opS(); n.desmVal=o?o.valor:0; }
+      $("#nv-sini").querySelectorAll("[data-si]").forEach(x=>x.classList.toggle("pri", x.dataset.si==="__outro" ? !!n.servOutro : (!n.servOutro && x.dataset.si===n.servIni)));
+      $("#nv-soutw").hidden=!n.servOutro; if (n.servOutro) setTimeout(()=>$("#nv-sout").focus(),50); upT(); nvAtualiza(); };
+    $("#nv-sout").oninput=e=>{ if (!n.servOutro) return; n.servIni=e.target.value; upT(); nvAtualiza(); };
+    $("#nv-sval").oninput=e=>{ if (!n.servOutro) return; n.desmVal=parseValor(e.target.value); upT(); };
     ["#nv-vei","#nv-pla"].forEach(id=>{ const i=$(id); if (i) i.addEventListener("input", ()=>setTimeout(upT,0)); });
   }
   nvRenderApSel();
