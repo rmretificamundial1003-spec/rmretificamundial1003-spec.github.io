@@ -304,8 +304,8 @@ table.tbig td{font-size:18px;padding:10px 8px}
 <script type="module">
 /* ===== Ligação do Sistema da Retífica com o Firebase ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, reauthenticateWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, doc, getDoc, getDocFromServer, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, reauthenticateWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, doc, getDoc, getDocFromServer, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, onSnapshot, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const CONFIG = {
   apiKey: "AIzaSyCIWGpFR91QHBmtKaqASuQFW-riMwJWGgk",
@@ -448,7 +448,7 @@ async function entrarGoogle() {
   }
 }
 function telaEntrar(msg) {
-  tela(`<p style="margin:14px 0 6px">Para abrir o sistema, entre com o <b>Gmail</b> que o chefe cadastrou para você.</p>
+  tela(`<p style="margin:14px 0 6px">Para abrir o sistema, entre com o <b>Gmail</b> que o chefe cadastrou para você, <b>ou abra o link de acesso</b> que o chefe mandou.</p>
     <button type="button" id="fb-g" class="btn pri" style="width:100%;padding:14px;font-size:18px;justify-content:center">Entrar com Google</button>
     <div id="fb-err" style="color:var(--bad);font-weight:700;margin-top:8px">${esc(msg || "")}</div>`);
   document.getElementById("fb-g").onclick = entrarGoogle;
@@ -470,13 +470,50 @@ async function semear(email) {
   } catch (e) { console.error("semear", e); }
 }
 
+/* ---------- LINK DE ACESSO (sem Gmail) ----------
+   O chefe cria um link de uso único. Abrindo no aparelho, ele fica liberado (só nível lojista).
+   Para entrar no perfil, a pessoa SEMPRE escolhe o nome e digita a senha. O chefe pode tirar o aparelho a qualquer hora. */
+const ACESSO = (() => { try { const u = new URL(location.href); const t = u.searchParams.get("acesso") || ""; if (t) { u.searchParams.delete("acesso"); history.replaceState(null, "", u.pathname + (u.search || "") + u.hash); } return /^[A-Za-z0-9]{20,64}$/.test(t) ? t : ""; } catch (e) { return ""; } })();
+function nomeAparelho() { const ua = navigator.userAgent || ""; const so = /Android/i.test(ua) ? "Android" : /iPhone|iPad/i.test(ua) ? "iPhone/iPad" : /Windows/i.test(ua) ? "Windows" : /Mac/i.test(ua) ? "Mac" : "Aparelho"; const nav = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : ""; return so + (nav ? " · " + nav : ""); }
+async function usarLink(u) {
+  tela(`<p style="margin:14px 0">Liberando este aparelho…</p>`);
+  const b = writeBatch(fs);
+  b.set(doc(fs, "aparelhos", u.uid), { token: ACESSO, em: Date.now(), nome: nomeAparelho(), ua: (navigator.userAgent || "").slice(0, 160) });
+  b.update(doc(fs, "convites", ACESSO), { usado: true, uid: u.uid, usadoEm: Date.now() });
+  await b.commit();
+}
+function telaLinkRuim() {
+  tela(`<p style="margin:14px 0 6px"><b>Este link de acesso não vale mais.</b></p>
+    <p class="muted">Cada link libera <b>um aparelho só</b> e vence em 7 dias. Peça ao chefe um link novo (Equipe → 🔗 Link de acesso).</p>
+    <button type="button" id="fb-g2" class="btn" style="width:100%;justify-content:center">Entrar com Google</button>`);
+  document.getElementById("fb-g2").onclick = async () => { await signOut(auth); entrarGoogle(); };
+}
+
 let pronto; const prontoP = new Promise(r => pronto = r);
 let jaLiberado = false;
 getRedirectResult(auth).catch(() => {});
 tela(`<p style="margin:14px 0">Carregando…</p>`);
 onAuthStateChanged(auth, async u => {
   if (jaLiberado) { if (!u) location.reload(); return; }
-  if (!u) { telaEntrar(); return; }
+  if (!u) { if (ACESSO) { try { await signInAnonymously(auth); } catch (e) { tela(`<p style="margin:14px 0">Não consegui liberar este aparelho. Peça ao chefe para ativar o <b>acesso por link</b> no Firebase.</p>`); } return; } telaEntrar(); return; }
+  if (u.isAnonymous) {
+    let ap = null;
+    try { const s0 = await getDocFromServer(doc(fs, "aparelhos", u.uid)); if (s0.exists()) ap = s0.data(); } catch (e) { if (e && e.code === "unavailable") { tela(`<p style="margin:14px 0">Sem internet agora. Conecte e toque em <button class="btn sm" onclick="location.reload()">Tentar de novo</button></p>`); return; } }
+    if (!ap && ACESSO) { try { await usarLink(u); const s1 = await getDocFromServer(doc(fs, "aparelhos", u.uid)); if (s1.exists()) ap = s1.data(); } catch (e) { console.error(e); } }
+    if (!ap) { if (ACESSO) telaLinkRuim(); else telaEntrar("Este aparelho não está mais liberado. Peça um link de acesso novo ao chefe."); return; }
+    jaLiberado = true;
+    window.__FB = { email: "", aparelho: true, aparelhoNome: ap.nome || "", dono: false, compartilhado: true, adm: false, papel: "lojista",
+      sair: async () => { location.reload(); },
+      idToken: () => auth.currentUser.getIdToken(), urlArquivo: id => urlArquivo(id), arquivoUrl: id => urlArquivo(id),
+      tokenDrive() { return Promise.reject({ code: "drive", message: "este aparelho entra por link, sem Gmail." }); },
+      async salvarDrive() { throw { code: "drive", message: "este aparelho entra por link, sem Gmail." }; },
+      async liberar() { throw new Error("Só o chefe pode mudar Gmails."); } };
+    setInterval(async () => { if (document.hidden) return;
+      try { const p = await getDocFromServer(doc(fs, "aparelhos", u.uid)); if (!p.exists()) throw { code: "permission-denied" }; }
+      catch (e) { if (e && e.code === "permission-denied") { try { sessionStorage.clear(); } catch (x) {} await signOut(auth); location.reload(); } } }, 90000);
+    new MutationObserver(varrerImagens).observe(document.body, { childList: true, subtree: true });
+    pronto(); return;
+  }
   const email = String(u.email || "").toLowerCase();
   tela(`<p style="margin:14px 0">Conferindo o acesso de ${esc(email)}…</p>`);
   let info = {};
@@ -915,7 +952,7 @@ function telaLogin(){
     <button type="submit" class="btn pri" style="width:100%;padding:14px;font-size:18px;justify-content:center">Entrar</button>
     <div id="lerr" style="color:var(--bad);font-weight:700"></div>
     ${loginSel && loginSel!=="__restrito"?`<button type="button" id="esqueci" class="btn sm" style="align-self:center;opacity:.8">Esqueci a senha</button>`:""}</form>
-    ${FBc?`<div class="muted" style="font-size:12px;text-align:center;margin-top:4px">Conectado com ${h(FBc.email)} · <button type="button" id="fb-sair" class="btn sm" style="padding:2px 8px;font-size:12px">Sair do Google</button></div>`:""}</div></div>`;
+    ${FBc?(FBc.aparelho?`<div class="muted" style="font-size:12px;text-align:center;margin-top:4px">🔗 Aparelho liberado por link de acesso${FBc.aparelhoNome?" · "+h(FBc.aparelhoNome):""}</div>`:`<div class="muted" style="font-size:12px;text-align:center;margin-top:4px">Conectado com ${h(FBc.email)} · <button type="button" id="fb-sair" class="btn sm" style="padding:2px 8px;font-size:12px">Sair do Google</button></div>`):""}</div></div>`;
   if ($("#esqueci")) $("#esqueci").onclick=async()=>{ const f=S.funcionarios.find(x=>x.id===loginSel); if (!f) return;
     if ((S.pedidosSenha||[]).some(p=>p.funcId===f.id && p.status==="aberto" && Date.now()-p.em<864e5)){ toast("Seu pedido já foi enviado. Fale com o chefe ou gerente."); return; }
     try{ await db.collection("pedidosSenha").add({funcId:f.id, nome:f.nome, papel:f.papel, em:Date.now(), aparelho:aparelhoTxt(), status:"aberto"}); toast("✅ Pedido enviado ao chefe/gerente. Peça a ele sua senha."); }catch(err){ erro(err); } };
@@ -6670,8 +6707,31 @@ function formZerar(){ if (!ehDono()){ toast("Só o dono."); return; }
       }catch(err){ erro(err); b.disabled=false; $("#zr-x",m).disabled=false; } };
   });
 }
+const LINK_SITE = () => (location.origin && location.origin.startsWith("http") ? location.origin + location.pathname : "https://rmretificamundial1003-spec.github.io/");
+async function criarLinkAcesso(){ if (!direcao()){ toast("Só chefe ou gerente."); return; }
+  const tk=novoToken(), agora=Date.now();
+  try{ await db.doc("convites/"+tk).set({papel:"lojista", usado:false, em:agora, expira:agora+7*864e5, por:me.id, porNome:me.nome}); }catch(err){ erro(err); return; }
+  auditar("Equipe", "Link de acesso criado", null, {por:me.nome});
+  const link=LINK_SITE()+"?acesso="+tk;
+  abrirModal(`<h2>🔗 Link de acesso criado</h2><p style="margin:0 0 8px">Abra este link <b>no aparelho da loja</b>. Ele libera <b>só esse aparelho</b> (uso único, vale 7 dias). Depois, cada lojista entra com o nome e a senha.</p>
+    <div class="card" style="padding:10px;word-break:break-all;font-size:14px;user-select:all" id="la-t">${h(link)}</div>
+    <div style="display:grid;gap:8px;margin-top:8px"><button class="btn pri" id="la-cp" style="justify-content:center;min-height:48px">📋 Copiar o link</button>
+    <a class="btn" style="justify-content:center;min-height:48px;background:#1fa855;border-color:#1fa855;color:#fff" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent("Link de acesso ao sistema da "+nomeEmp()+" (abra no aparelho da loja):\n"+link)}">📲 Mandar pelo WhatsApp</a></div>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">⚠️ Não poste esse link em grupo: quem abrir primeiro libera o aparelho dele. Se isso acontecer, é só tirar o aparelho aqui na Equipe.</p>
+    <div class="acts"><button class="btn" id="la-x">Fechar</button></div>`, m=>{ $("#la-x",m).onclick=fecharModal;
+    $("#la-cp",m).onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast("📋 Link copiado"); }catch(e){ toast("Segure o dedo no link para copiar."); } }; }); }
+async function carregarAparelhos(){ const el=$("#eq-aps"); if (!el) return;
+  try{ const [a,c]=await Promise.all([db.collection("aparelhos").get(), db.collection("convites").get()]); if (!$("#eq-aps")) return;
+    const ap=a.docs.map(d=>Object.assign({id:d.id},d.data())).sort((x,y)=>(y.em||0)-(x.em||0)), cv=c.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>!x.usado && (x.expira||0)>Date.now());
+    el.innerHTML = (ap.length?`<b>Aparelhos liberados (${ap.length})</b>`+ap.map(x=>`<div class="row" style="gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1">📱 ${h(x.nome||"Aparelho")}<br><span class="muted" style="font-size:12px">liberado em ${dt(x.em)}</span></span><button class="btn danger" data-apx="${x.id}">Tirar</button></div>`).join(""):`<div class="muted">Nenhum aparelho liberado por link.</div>`)
+      + (cv.length?`<div class="muted" style="font-size:13px;margin-top:8px">${cv.length} link(s) ainda não usado(s) · <button class="btn sm" id="eq-cvx">Cancelar links não usados</button></div>`:"");
+    el.onclick=async e=>{ const b=e.target.closest("[data-apx]"); if (b){ if (!(await perguntar("Tirar este aparelho? Ele sai do sistema na hora e só volta com um link novo.", "Tirar"))) return; try{ await db.doc("aparelhos/"+b.dataset.apx).delete(); auditar("Equipe","Aparelho tirado",null,{por:me.nome}); toast("Aparelho tirado"); carregarAparelhos(); }catch(err){ erro(err); } return; }
+      if (e.target.closest("#eq-cvx")){ try{ for (const x of cv) await db.doc("convites/"+x.id).delete(); toast("Links cancelados"); carregarAparelhos(); }catch(err){ erro(err); } } };
+  }catch(err){ el.innerHTML=`<div class="muted">Não consegui ver os aparelhos agora.</div>`; } }
 SHELL.equipe = () => `<div class="top"><h1>Equipe</h1><div class="row" style="gap:6px">${ehChefe() && !idDono() && (!window.__FB || window.__FB.dono) ? `<button class="btn" id="eq-dono">👑 Eu sou o dono</button>` : ehDono() ? `<span class="pill" style="align-self:center">👑 Você é o dono · invisível</span>` : ""}${ehDono()?`<button class="btn" id="eq-senhas">🔑 Senhas da equipe</button><button class="btn danger" id="eq-zerar">🧹 Começar de verdade</button>`:""}<button class="btn pri" id="novo-f">Cadastrar pessoa</button></div></div>
   <div class="card" id="eq-pedsen" hidden></div>
+  ${direcao()?`<div class="card" style="margin-bottom:14px"><h2>🔗 Link de acesso (sem Gmail)</h2><p class="muted" style="margin:4px 0 8px">Para o aparelho da loja entrar <b>sem Gmail</b>. Cada link libera <b>um aparelho só</b> e vale 7 dias. No aparelho liberado aparecem os lojistas, e cada um entra com o nome e a <b>senha</b>. Se o aparelho for perdido, toque em <b>Tirar</b>.</p>
+    <button class="btn pri" id="eq-link" style="min-height:48px">🔗 Criar link de acesso</button><div id="eq-aps" style="margin-top:10px"></div></div>`:""}
   <div class="card" style="margin-bottom:14px"><h2>📱 Quem está conectado</h2><p class="muted" style="margin:4px 0 8px">Sessões abertas nas últimas 12 horas. Tocar em <b>Encerrar</b> tira a pessoa do sistema na hora, naquele aparelho.</p><div id="eq-ses"></div></div>
   <div class="card"><p class="muted" style="margin:0 0 10px">${OFICINA?"":"<b>Fase 1:</b> só chefes, gerente e lojistas. Lojista entra tocando no nome e digitando a senha. "}${OFICINA?"Mecânicos entram tocando no nome e digitando a senha.":""} Gerente e chefe não aparecem na tela de entrada: entram por "🔒 Acesso restrito", só com a senha (que precisa ser diferente para cada um). <b>Chefe</b> vê tudo, inclusive faturamento, custos e equipe. <b>Gerente</b> cuida da operação (painel, OS, estoque, loja, clientes e registro das notas fiscais) e vê os valores de cada item, mas não os totais do dia e do mês. <b>Mecânico</b> pertence a um setor e já abre vendo as OS do setor dele. Ele lança peças usadas, fotos e anotações, e muda a situação do serviço.</p><div class="tbl-wrap" id="f-lista"></div></div>
   <div class="card" style="margin-top:14px;${OFICINA?"":"display:none"}"><h2>Setores da oficina</h2><p class="muted" style="margin:4px 0 10px">A ordem aqui é o caminho normal do motor na oficina. Cada mecânico pertence a um setor e vê as OS que estão nele.</p>
@@ -6736,7 +6796,8 @@ async function apagarTeste(){
   if (assets) for (const id of ids){ await assets.delete(id).catch(()=>{}); }
   msg.textContent = `Pronto: ${n} registros e ${ids.size} arquivos apagados.`;
 }
-BIND.equipe = () => { $("#novo-f").onclick=()=>formFunc(); { const bs=$("#eq-senhas"); if (bs) bs.onclick=verSenhasEquipe; } { const bz=$("#eq-zerar"); if (bz) bz.onclick=formZerar; }
+BIND.equipe = () => { { const bl=$("#eq-link"); if (bl) bl.onclick=criarLinkAcesso; } carregarAparelhos();
+  $("#novo-f").onclick=()=>formFunc(); { const bs=$("#eq-senhas"); if (bs) bs.onclick=verSenhasEquipe; } { const bz=$("#eq-zerar"); if (bz) bz.onclick=formZerar; }
   $("#f-lista").addEventListener("click", e=>{ const b=e.target.closest("[data-comoid]"); if(!b) return; const f=S.funcionarios.find(x=>x.id===b.dataset.comoid); if(!f) return; entrarComoDono(f); });
   if ($("#eq-dono")) $("#eq-dono").onclick=()=>confirmar(`Marcar ${me.nome} como o DONO? Você vai ver tudo (inclusive os outros chefes) e ficar invisível para todos. Só pode existir um dono, e ninguém mais consegue ativar isso.`, async()=>{ try{ await db.doc("funcionarios/"+me.id).update({dono:true}); me.dono=true; toast("👑 Pronto: você é o dono."); }catch(err){ erro(err); } });
   $("#eq-ses").onclick=e=>{ const b=e.target.closest("[data-encses]"); if(!b) return; const x=(S.sessoes||[]).find(y=>y.id===b.dataset.encses); if(!x) return;
