@@ -45,6 +45,16 @@ details.dcol:not([open]){padding-top:12px;padding-bottom:12px} .dsub{color:var(-
 .nav .badge{background:#ffffff26;border-radius:10px;padding:0 7px;font-size:12px}
 .me{margin-top:auto;border-top:1px solid #ffffff1f;padding:12px 10px 0;font-size:13px}
 .troca-fixa{display:none}
+.gal-ov{position:fixed;inset:0;z-index:200;background:#000f;display:flex;flex-direction:column;color:#fff;user-select:none}
+.gal-top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;font-size:17px;font-weight:700}
+.gal-x{background:#ffffff22;border:0;color:#fff;font-size:24px;width:48px;height:48px;border-radius:50%;cursor:pointer}
+.gal-st{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;touch-action:pan-y}
+.gal-img{max-width:100%;max-height:100%;object-fit:contain}
+.gal-b{position:absolute;top:50%;transform:translateY(-50%);background:#ffffff26;border:0;color:#fff;font-size:28px;width:56px;height:72px;border-radius:12px;cursor:pointer}
+.gal-p{left:6px}.gal-s{right:6px}
+.gal-th{display:flex;gap:6px;overflow-x:auto;padding:8px 10px 14px;justify-content:flex-start}.gal-th:empty{display:none}
+.gal-th img{width:58px;height:58px;object-fit:cover;border-radius:8px;opacity:.5;border:2px solid transparent;cursor:pointer;flex:0 0 auto}.gal-th img.on{opacity:1;border-color:var(--accent)}
+body.tem-gal{overflow:hidden}
 .av-lista{display:grid;gap:5px}.av-row{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:2px 4px;background:var(--surface-2,#151515)}.av-row.on{border-color:var(--ok);background:#12301c}
 .av-tg{flex:1;text-align:left;background:none;border:0;color:var(--ink);font-size:17px;font-weight:600;padding:10px 6px;min-height:48px;cursor:pointer}.av-row.on .av-tg{color:#5ee08a}.av-tg small{font-weight:400;color:var(--muted)}
 .av-qt{display:flex;align-items:center;gap:4px}.av-qt button{width:42px;height:42px;font-size:22px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}.av-qt b{min-width:26px;text-align:center;font-size:18px}.av-md{width:42px;height:42px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:18px}
@@ -3680,7 +3690,7 @@ function verNotaApanha(a){ const o=a.osId?S.os.find(x=>x.id===a.osId):null;
     ${!podeAbrirOS()||SEM_OS()?"":o?`<button class="btn" data-na="os" style="justify-content:center;min-height:48px">Abrir a OS ${codOS(o)}</button>`:`<button class="btn" data-na="nova" style="justify-content:center;min-height:48px">🔧 Abrir a OS desta nota</button>`}
     ${(()=>{ const e=estadoAval(a), v=a.aval||{}; if (e.k==="falta") return a.cancelada?"":`<div class="card" style="padding:8px 12px;border-left:5px solid var(--warn)">🔧 <b>A oficina ainda não avaliou o motor.</b></div>`;
       return `<div class="card" style="padding:10px 12px;border-left:5px solid ${e.cor}"><b>${e.t}</b><div class="muted" style="font-size:13px">Avaliado por ${h(v.avaliador||"")} · ${(v.servicos||[]).length} serviço(s) · ${(v.pecas||[]).length} peça(s)</div>
-        <div style="font-size:14px;margin-top:4px">${(v.servicos||[]).map(x=>"🔧 "+(x.qtd||1)+"x "+h(x.desc)).join("<br>")}${(v.pecas||[]).length?"<br>"+(v.pecas||[]).map(x=>"🔩 "+(x.qtd||1)+"x "+h(x.nome)+(x.obs?" ("+h(x.obs)+")":"")).join("<br>"):""}</div>
+        <div style="font-size:14px;margin-top:4px">${(v.servicos||[]).map(x=>"🔧 "+(x.qtd||1)+"x "+h(x.desc)).concat(v.obs?["🔧 1x "+h(v.obs)+" <span class=\"muted\">(observação)</span>"]:[]).join("<br>")}${(v.pecas||[]).length?"<br>"+(v.pecas||[]).map(x=>"🔩 "+(x.qtd||1)+"x "+h(x.nome)+(x.obs?" ("+h(x.obs)+")":"")).join("<br>"):""}</div>
         ${e.k!=="rasc"&&!a.cancelada&&me.papel!=="funcionario"?`<button class="btn pri" data-na="orc" style="width:100%;justify-content:center;min-height:48px;margin-top:8px">📋 Ver e passar para a Softcom</button>`:""}
         ${!a.cancelada&&me.papel!=="funcionario"?`<button class="btn" data-na="rei" style="width:100%;justify-content:center;min-height:42px;margin-top:6px;border-color:var(--warn)">🔄 Reiniciar a avaliação</button>`:""}</div>`; })()}
     <button class="btn" data-na="pdf" style="justify-content:center;min-height:52px;background:#1fa855;border-color:#1fa855;color:#fff">📲 Enviar a nota em PDF pelo WhatsApp</button>
@@ -3700,7 +3710,7 @@ function verNotaApanha(a){ const o=a.osId?S.os.find(x=>x.id===a.osId):null;
 const novoIdItem = () => Math.random().toString(36).slice(2,10);
 const STATUS_PECA = {pedida:"📝 Pedida", orcada:"💲 Orçada", comprada:"🛒 Comprada", chegou:"✅ Chegou"};
 function estadoAval(a){ const v=a.aval, o=a.orc||{};
-  if (!v || !((v.servicos||[]).length || (v.pecas||[]).length)) return {k:"falta", t:"🔧 Falta avaliar", cor:"var(--warn)"};
+  if (!v || !((v.servicos||[]).length || (v.pecas||[]).length || v.obs)) return {k:"falta", t:"🔧 Falta avaliar", cor:"var(--warn)"};
   if (v.status!=="pronta") return {k:"rasc", t:"🔧 Avaliação em andamento", cor:"var(--warn)"};
   if (a.softcom) return {k:"passado", t:"✅ Já passado para a Softcom", cor:"var(--ok)"};
   if (a.avalMudou) return {k:"orcar", t:"⚠️ Avaliação mudou · passar de novo", cor:"var(--warn)"};
@@ -3727,7 +3737,7 @@ FILL.orcamentos = () => { if (!$("#oq-l")) return; const q=norm(UI.oqQ||""), f=U
     return `<div class="card click" data-oid="${a.id}" style="margin-bottom:8px;padding:12px 14px;cursor:pointer;border-left:5px solid ${e.cor}">
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b class="mono">${codNA(a)}</b><b style="font-size:17px">${h(a.cliente)}</b></div>
       <div class="muted" style="font-size:14px;margin-top:3px">${h([a.veiculo,a.placa,a.motor&&"motor "+a.motor].filter(Boolean).join(" · "))}</div>
-      <div style="font-size:14px;margin-top:4px"><b style="color:${e.cor}">${e.t}</b> · ${(v.servicos||[]).length} serviço(s) · ${(v.pecas||[]).length} peça(s) · por ${h(v.avaliador||"")}</div>
+      <div style="font-size:14px;margin-top:4px"><b style="color:${e.cor}">${e.t}</b> · ${(v.servicos||[]).length+(v.obs?1:0)} serviço(s) · ${(v.pecas||[]).length} peça(s) · por ${h(v.avaliador||"")}</div>
       <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn pri" data-cp1="1" style="flex:1;justify-content:center;min-height:44px">📋 Copiar</button><button type="button" class="btn" style="flex:1;justify-content:center;min-height:44px">👁 Ver tudo</button><button type="button" class="btn" data-ver="1" style="justify-content:center;min-height:44px">🚗</button></div></div>`; }).join("")
     : `<div class="empty">${{orcar:"Nada para passar para a Softcom. 👍",passado:"Nada passado ainda.",todos:"A oficina ainda não avaliou nenhum motor."}[f]}</div>`; };
 SHELL.avaliar = () => `<div class="top"><h1>🔧 Avaliar motores</h1></div>
@@ -3764,7 +3774,7 @@ function formAvaliacao(a){ const v=JSON.parse(JSON.stringify(a.aval||{servicos:[
     <div style="margin:4px 0"><b>👤 Escreva seu nome</b><input id="av-quem" value="${me.papel==="funcionario"?"":h(me.nome)}" placeholder="Seu nome" autocomplete="off" style="width:100%;margin-top:6px;font-size:18px"></div>
     <div class="muted" style="font-size:13px;margin-top:8px">Toque para marcar ☑. Toque de novo para desmarcar. Use − e + para a quantidade.</div>
     <div id="av-blk">${bloco()}</div>
-    <label class="f" style="margin-top:12px">📝 Observação<textarea id="av-ob" rows="2">${h(v.obs||"")}</textarea></label>
+    <label class="f" style="margin-top:12px">📝 Observação <span class="muted" style="font-size:13px">(vai como serviço a fazer)</span><textarea id="av-ob" rows="2" placeholder="Ex.: trocar a junta da tampa de válvula">${h(v.obs||"")}</textarea></label>
     <div class="acts" style="flex-wrap:wrap"><button class="btn" id="av-x" title="Fechar">✕</button><button class="btn" id="av-sv">💾 Salvar</button><button class="btn pri" id="av-ok" style="min-height:48px">✅ Pronto</button></div>`, m=>{
     const re=()=>{ const y=m.scrollTop; $("#av-blk",m).innerHTML=bloco(); ligarExtra(); m.scrollTop=y; };
     const ligarExtra=()=>{
@@ -3782,7 +3792,7 @@ function formAvaliacao(a){ const v=JSON.parse(JSON.stringify(a.aval||{servicos:[
         box.innerHTML=`<input value="${h(x.obs||"")}" placeholder="Medida (ex.: 0,50)" style="flex:1;font-size:17px"><button type="button" class="btn pri">OK</button>`; lin.after(box); const inp=box.querySelector("input"); inp.focus();
         box.querySelector("button").onclick=()=>{ x.obs=inp.value.trim(); re(); }; } };
     const salvar=async(pronta)=>{ const q=$("#av-quem",m).value.trim(); if (!q){ toast("👤 Escreva seu nome lá em cima."); $("#av-quem",m).scrollIntoView({block:"center"}); $("#av-quem",m).focus(); return; }
-      if (pronta && !v.servicos.length && !v.pecas.length){ toast("Marque pelo menos um serviço ou uma peça."); return; }
+      if (pronta && !v.servicos.length && !v.pecas.length && !$("#av-ob",m).value.trim()){ toast("Marque pelo menos um serviço ou uma peça."); return; }
       const atual=S.apanhas.find(x=>x.id===a.id)||a, antes=atual.aval||{}, agora=Date.now();
       const nv={servicos:v.servicos, pecas:v.pecas.map(x=>{ const o=(antes.pecas||[]).find(y=>y.id===x.id); return o?Object.assign({},x,{status:o.status||x.status}):x; }), obs:$("#av-ob",m).value.trim(), avaliador: me.papel==="funcionario" ? q : (antes.avaliador||q), corrigidoPor: me.papel==="funcionario" ? (antes.corrigidoPor||null) : {nome:q, em:agora}, porNome:me.nome, status: pronta||antes.status==="pronta" ? "pronta" : "rascunho", em:antes.em||agora, atualizadoEm:agora, prontaEm: pronta&&antes.status!=="pronta" ? agora : (antes.prontaEm||null)};
       const novosS=nv.servicos.filter(x=>!(antes.servicos||[]).some(y=>y.id===x.id)), novosP=nv.pecas.filter(x=>!(antes.pecas||[]).some(y=>y.id===x.id));
@@ -3797,9 +3807,8 @@ function formAvaliacao(a){ const v=JSON.parse(JSON.stringify(a.aval||{servicos:[
 function formOrcamentoNota(a){ const v=a.aval||{servicos:[],pecas:[]};
   abrirModal(`<h2>📋 ${codNA(a)} · ${h(a.cliente)}</h2><div class="muted" style="font-size:14px;margin:-4px 0 8px">${h([a.veiculo,a.placa,a.motor&&"motor "+a.motor].filter(Boolean).join(" · "))}<br>Avaliado por <b>${h(v.avaliador||"")}</b> em ${dt(v.prontaEm||v.atualizadoEm||v.em)}</div>
     ${a.softcom?`<div class="banner" style="margin:0 0 8px;border-left:5px solid var(--ok)">✅ Passado para a Softcom por ${h(a.softcom.porNome)} em ${dt(a.softcom.em)}</div>`:a.avalMudou?`<div class="banner warn" style="margin:0 0 8px;border-left:5px solid var(--warn)">⚠️ <b>${h(a.avalMudou.porNome)} mudou a avaliação</b> em ${dt(a.avalMudou.em)}. Confira e <b>atualize na Softcom</b>. O que mudou está no histórico da nota.</div>`:""}
-    <h3 style="margin:8px 0 4px">🔧 Serviços (${(v.servicos||[]).length})</h3>${(v.servicos||[]).map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:16px"><b>${x.qtd||1}x</b> ${h(x.desc)}${x.obs?` <span class="muted">(${h(x.obs)})</span>`:""}</div>`).join("")||`<div class="muted">Nenhum.</div>`}
+    <h3 style="margin:8px 0 4px">🔧 Serviços (${(v.servicos||[]).length+(v.obs?1:0)})</h3>${(v.servicos||[]).map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:16px"><b>${x.qtd||1}x</b> ${h(x.desc)}${x.obs?` <span class="muted">(${h(x.obs)})</span>`:""}</div>`).join("")}${v.obs?`<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:16px"><b>1x</b> ${h(v.obs)} <span class="muted">(observação da oficina)</span></div>`:""}${!(v.servicos||[]).length&&!v.obs?`<div class="muted">Nenhum.</div>`:""}
     <h3 style="margin:12px 0 4px">🔩 Peças (${(v.pecas||[]).length})</h3>${(v.pecas||[]).map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:16px"><b>${x.qtd||1}x</b> ${h(x.nome)}${x.obs?` <span class="muted">(${h(x.obs)})</span>`:""}</div>`).join("")||`<div class="muted">Nenhuma.</div>`}
-    ${v.obs?`<div class="banner" style="margin:10px 0 0">📝 ${h(v.obs)}</div>`:""}
     <div style="display:grid;gap:8px;margin-top:12px">
       <button class="btn pri" id="oc-cp" style="justify-content:center;min-height:52px;font-size:17px">📋 Copiar para a Softcom</button>
       ${a.softcom?`<button class="btn" id="oc-desf" style="justify-content:center;min-height:44px">↩️ Ainda não passei</button>`:`<button class="btn" id="oc-ok" style="justify-content:center;min-height:52px;border-color:var(--ok)">✅ Já passei para a Softcom</button>`}
@@ -3820,8 +3829,9 @@ async function reiniciarAvaliacao(a){
 function textoOrcNota(a){ const v=a.aval||{}, c=S.clientes.find(x=>x.id===a.clienteId)||{};
   const L=[`AVALIAÇÃO DO MOTOR ${codNA(a)} · ${nomeEmp()}`, `Cliente: ${a.cliente||""}${c.doc?" · CPF/CNPJ "+c.doc:""}${a.telefone?" · "+a.telefone:""}`, `Veículo: ${[a.veiculo,a.placa,a.motor&&"motor "+a.motor].filter(Boolean).join(" · ")}`, `Avaliado por: ${v.avaliador||""} em ${dt(v.prontaEm||v.atualizadoEm||v.em)}`, "", "SERVIÇOS:"];
   (v.servicos||[]).forEach(x=>L.push(`- ${x.qtd||1}x ${x.desc}${x.obs?" ("+x.obs+")":""}`));
+  if (v.obs) L.push(`- 1x ${v.obs} (observação da oficina)`);
   if ((v.pecas||[]).length){ L.push("", "PEÇAS:"); v.pecas.forEach(x=>L.push(`- ${x.qtd||1}x ${x.nome}${x.obs?" ("+x.obs+")":""}`)); }
-  if (v.obs) L.push("", "Observação: "+v.obs); return L.join("\n"); }
+  return L.join("\n"); }
 async function copiarTexto(t, ok){ try{ await navigator.clipboard.writeText(t); toast(ok||"📋 Copiado"); }catch(e){ const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); toast(ok||"📋 Copiado"); }catch(_){ toast("Segure o dedo no texto para copiar."); } ta.remove(); } }
 function formOsSoftcom(a){ abrirModal(`<h2>🧾 OS aberta na Softcom</h2><p class="muted" style="margin:0 0 8px">Depois de abrir a OS na Softcom, anote o número aqui para ficar ligado a esta nota.</p>
     <label class="f">Número da OS na Softcom<input id="sc-n" inputmode="numeric" value="${h((a.osSoftcom||{}).numero||"")}"></label>
@@ -7095,6 +7105,38 @@ function formFunc(f){
 }
 
 iniciar();
+})();
+
+/* ===== GALERIA: tocar numa foto abre todas daquela tela, e dá para PASSAR (◀ ▶ ou arrastando o dedo) ===== */
+(function(){
+  const eFoto = img => img && img.tagName==="IMG" && !img.classList.contains("av") && !img.closest(".who,.me,.gal-ov") && (img.hasAttribute("data-blob") || /\/_blob\//.test(img.getAttribute("src")||""));
+  const chave = img => img.getAttribute("data-blob") || (img.getAttribute("src")||"").split("/_blob/")[1] || img.src;
+  function abrir(lista, i){
+    const ov=document.createElement("div"); ov.className="gal-ov";
+    ov.innerHTML=`<div class="gal-top"><span class="gal-n"></span><button type="button" class="gal-x" aria-label="Fechar">✕</button></div>
+      <div class="gal-st"><img class="gal-img" alt="Foto"></div>
+      <button type="button" class="gal-b gal-p" aria-label="Anterior">◀</button><button type="button" class="gal-b gal-s" aria-label="Próxima">▶</button>
+      <div class="gal-th"></div>`;
+    document.body.appendChild(ov); document.body.classList.add("tem-gal");
+    const im=ov.querySelector(".gal-img"), n=ov.querySelector(".gal-n"), th=ov.querySelector(".gal-th");
+    th.innerHTML = lista.length>1 ? lista.map((u,k)=>`<img src="${u}" data-k="${k}" alt="">`).join("") : "";
+    const ir=k=>{ i=(k+lista.length)%lista.length; im.src=lista[i]; n.textContent=lista.length>1?`${i+1} de ${lista.length}`:""; th.querySelectorAll("img").forEach((x,kk)=>x.classList.toggle("on",kk===i)); const at=th.children[i]; if (at) at.scrollIntoView({inline:"center",block:"nearest"}); ov.querySelector(".gal-p").hidden=ov.querySelector(".gal-s").hidden=lista.length<2; };
+    const fechar=()=>{ ov.remove(); document.body.classList.remove("tem-gal"); document.removeEventListener("keydown",tecla,true); };
+    const tecla=e=>{ if (e.key==="ArrowRight"){ ir(i+1); e.preventDefault(); } else if (e.key==="ArrowLeft"){ ir(i-1); e.preventDefault(); } else if (e.key==="Escape"){ fechar(); e.preventDefault(); e.stopPropagation(); } };
+    document.addEventListener("keydown",tecla,true);
+    ov.querySelector(".gal-x").onclick=fechar; ov.querySelector(".gal-p").onclick=()=>ir(i-1); ov.querySelector(".gal-s").onclick=()=>ir(i+1);
+    th.onclick=e=>{ const t=e.target.closest("[data-k]"); if (t) ir(+t.dataset.k); };
+    ov.querySelector(".gal-st").onclick=e=>{ if (e.target===e.currentTarget) fechar(); };
+    let x0=null, y0=0; const st=ov.querySelector(".gal-st");
+    st.addEventListener("touchstart",e=>{ x0=e.touches[0].clientX; y0=e.touches[0].clientY; },{passive:true});
+    st.addEventListener("touchend",e=>{ if (x0===null) return; const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0; x0=null; if (Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)) ir(i+(dx<0?1:-1)); else if (dy>90) fechar(); },{passive:true});
+    ir(i); }
+  document.addEventListener("click", e=>{ const img=e.target.closest("img"); if (!eFoto(img)) return;
+    e.preventDefault(); e.stopPropagation();
+    const caixa=img.closest(".modal") || img.closest("#main") || document.body;
+    const todas=[...caixa.querySelectorAll("img")].filter(eFoto), vistas=new Set(), lista=[]; let idx=0;
+    todas.forEach(x=>{ const k=chave(x); if (vistas.has(k)) { if (x===img) idx=lista.indexOf(x.src); return; } vistas.add(k); if (x===img) idx=lista.length; lista.push(x.src); });
+    abrir(lista.filter(Boolean), idx); }, true);
 })();
 </script>
 </body>
